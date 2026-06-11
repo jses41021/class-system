@@ -99,3 +99,24 @@ if not all_df.empty:
                         st.write(f"第 {g_idx+1} 組: {', '.join(full_names)}")
                 else:
                     st.error("出席人數不足以分組")
+# 繳費統計區塊 (新增 tab4)
+    # 如果您原本只有 tab1~tab3，請記得將上方 st.tabs 改為 st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
+    
+    with tab4:
+        st.subheader(f"{selected_class} 繳費管理")
+        
+        # 初始化該班級的繳費狀態 (預設為 False 即 未繳)
+        if f'payment_{selected_class}' not in st.session_state:
+            st.session_state[f'payment_{selected_class}'] = {name: False for name in df_class["姓名"]}
+            
+        # 顯示繳費清單
+        for _, row in df_class.iterrows():
+            name = row['姓名']
+            # 使用 checkbox：打勾即為「已繳費」
+            is_paid = st.checkbox(f"{get_display_name(row)}", value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
+            st.session_state[f'payment_{selected_class}'][name] = is_paid
+
+        # 顯示統計結果
+        paid_count = sum(st.session_state[f'payment_{selected_class}'].values())
+        st.write(f"---")
+        st.info(f"繳費統計：共 {len(df_class)} 人，已繳 {paid_count} 人，未繳 {len(df_class) - paid_count} 人")
