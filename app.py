@@ -50,18 +50,16 @@ if not all_df.empty:
 
     with tab2:
         st.subheader("抽籤與發言")
+        
+        # 修改點：在按鈕內部重新定義 present_students
         if st.button("🎲 隨機抽籤"):
-            if present_students:
-                winner = pd.Series(present_students).sample(1).iloc[0]
+            # 這裡重新篩選一次出席名單，確保是最新的
+            current_present = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
+            
+            if current_present:
+                winner = pd.Series(current_present).sample(1).iloc[0]
                 st.session_state[f'scores_{selected_class}'][winner] += 1
-                st.rerun()
-        for name in present_students:
-            row = df_class[df_class['姓名'] == name].iloc[0]
-            col1, col2 = st.columns([3, 1])
-            col1.write(f"{get_display_name(row)} (累積：{st.session_state[f'scores_{selected_class}'].get(name, 0)} 次)")
-            if col2.button("加分", key=f"btn_{name}"):
-                st.session_state[f'scores_{selected_class}'][name] += 1
-                st.rerun()
+                st.rerun() # 重新整理頁面以更新統計
 
     with tab3:
         st.subheader("隨機分組")
