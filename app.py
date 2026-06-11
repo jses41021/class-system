@@ -79,8 +79,7 @@ if not all_df.empty:
                     for g_idx, group in enumerate(groups):
                         full_names = [get_display_name(df_class[df_class['姓名'] == name].iloc[0]) for name in group]
                         st.write(f"第 {g_idx+1} 組: {', '.join(full_names)}")
-
-   with tab4:
+    with tab4:
         st.subheader(f"{selected_class} 繳費管理")
         # ... (原本的繳費勾選迴圈維持不變) ...
         
@@ -101,3 +100,4 @@ if not all_df.empty:
             # 使用 utf-8-sig 編碼，確保 Excel 打開不會亂碼
             csv = df_export.to_csv(index=False).encode('utf-8-sig')
             st.download_button("📥 點擊下載 CSV (欄位已拆分)", csv, f"{selected_class}_紀錄.csv", "text/csv")
+
