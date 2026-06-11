@@ -133,41 +133,43 @@ if not all_df.empty:
             file_name = f"{today}_{selected_class}.csv"
             
 # --- 放在第 135 行之後 ---
-        st.divider()
-# --- 顯示歷史紀錄與統計 (放在 135 行 st.download_button 之後) ---
+# --- 放在第 135 行 (st.download_button) 之後 ---
         st.divider()
         st.subheader("📊 20 週歷史紀錄與統計")
         
+        # 載入歷史資料
         history_df = load_history()
         
         if not history_df.empty:
-            # 確保班級欄位為數字以便比對
+            # 確保班級型態一致以利篩選
             history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
             class_history = history_df[history_df["班級"] == int(selected_class)]
             
             if not class_history.empty:
-                # 1. 顯示歷史明細 (這部分您原本就有)
+                # 1. 顯示歷史明細
                 st.write("### 歷史明細資料")
                 st.dataframe(class_history, use_container_width=True)
                 
-                # 2. 個人累積統計總表 (修正邏輯)
+                # 2. 個人累積統計總表
                 st.write("### 個人累積統計總表")
                 
-                # 計算「缺席總次數」與「發言總次數」
-                stats = class_history.groupby(['座號', '姓名']).agg({
+                # 計算：統計缺席與發言次數
+                stats = class_history.groupby(['班級', '座號', '姓名']).agg({
                     '出席': lambda x: (x == '缺席').sum(), 
                     '發言次數': 'sum'
                 }).reset_index()
                 
-                # 獲取「最後一次」的繳費狀態
+                # 獲取最新繳費狀態 (按日期取最後一筆)
                 latest_payment = class_history.sort_values('日期').groupby('姓名').tail(1)[['姓名', '繳費狀態']]
                 
-                # 合併統計與最新繳費狀態
+                # 合併統計與繳費狀態
                 final_stats = pd.merge(stats, latest_payment, on='姓名')
-                final_stats.columns = ['座號', '姓名', '缺席總次數', '發言總次數', '最新繳費狀態']
                 
-                # 顯示統計表
-                st.dataframe(final_stats.sort_values('座號'), use_container_width=True)
+                # 重新命名欄位順序
+                final_stats.columns = ['班級', '座號', '姓名', '缺席總次數', '發言總次數', '最新繳費狀態']
+                
+                # 顯示表格 (使用 hide_index=True 隱藏左側索引)
+                st.dataframe(final_stats.sort_values('座號'), use_container_width=True, hide_index=True)
             else:
                 st.info(f"{selected_class} 班目前尚無歷史紀錄。")
         else:
