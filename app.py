@@ -41,30 +41,34 @@ if not all_df.empty:
     present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
 
     # 抽籤與發言統計區塊 (替換原本的 tab2 內容)
+   # 抽籤與發言統計區塊
     with tab2:
         st.subheader("隨機抽籤與發言統計")
         
-        # 建立顯示名稱與原始姓名的映射 (供抽籤與加分使用)
-        # 確保顯示格式為：班級-座號-姓名
-        def get_display_name(row):
-            return f"{int(row['班級'])}-{int(row['座號'])}-{row['姓名']}"
+        # 1. 確保 session_state 記錄了最後抽中的人
+        if f'last_winner_{selected_class}' not in st.session_state:
+            st.session_state[f'last_winner_{selected_class}'] = None
 
-        # 抽籤按鈕移到上方
+        # 2. 抽籤按鈕
         if st.button("🎲 隨機抽籤 (僅限出席者)"):
             if present_students:
                 winner_name = pd.Series(present_students).sample(1).iloc[0]
                 st.session_state[f'scores_{selected_class}'][winner_name] += 1
-                st.balloons()
-                # 取得該生的完整資料列以顯示名稱
-                winner_row = df_class[df_class['姓名'] == winner_name].iloc[0]
-                st.success(f"🎉 抽中：{get_display_name(winner_row)}")
-                st.rerun()
+                # 記錄抽中者的名字
+                st.session_state[f'last_winner_{selected_class}'] = winner_name
+                st.rerun() # 重新整理以更新顯示
             else:
                 st.warning("目前沒有學生出席！")
         
+        # 3. 顯示抽籤結果 (固定在抽籤按鈕下方)
+        if st.session_state[f'last_winner_{selected_class}']:
+            winner_name = st.session_state[f'last_winner_{selected_class}']
+            winner_row = df_class[df_class['姓名'] == winner_name].iloc[0]
+            st.success(f"🎉 剛剛抽中：{get_display_name(winner_row)}")
+        
         st.write("---")
         
-        # 主動加分清單 (顯示格式：班級-座號-姓名)
+        # 4. 主動加分清單
         for name in present_students:
             col1, col2 = st.columns([3, 1])
             score = st.session_state[f'scores_{selected_class}'].get(name, 0)
@@ -72,6 +76,8 @@ if not all_df.empty:
             col1.write(f"{get_display_name(row)} (累積：{score} 次)")
             if col2.button("加分", key=f"btn_{name}"):
                 st.session_state[f'scores_{selected_class}'][name] += 1
+                # 當手動加分時，清除抽籤結果顯示，避免混淆
+                st.session_state[f'last_winner_{selected_class}'] = None
                 st.rerun()
 
     # 分組區塊 (替換原本的 tab3 內容)
