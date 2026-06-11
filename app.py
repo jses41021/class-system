@@ -124,3 +124,10 @@ if not all_df.empty:
             df_export = pd.DataFrame(export_data)
             csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
             st.download_button("📥 點擊下載 CSV", csv, f"{selected_class}_紀錄.csv", "text/csv")
+# --- 顯示歷史紀錄 ---
+        st.divider()
+        st.subheader("📊 20 週歷史紀錄")
+        if not history_df.empty:
+            st.dataframe(history_df, use_container_width=True)
+        else:
+            st.info("請確認「總資料庫」的 CSV 連結已設定正確，或目前尚無歷史紀錄。")
