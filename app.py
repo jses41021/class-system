@@ -111,22 +111,25 @@ if not all_df.empty:
         
         # 匯出紀錄按鈕 (欄位已拆分)
         # 匯出紀錄按鈕 (修改處)
+       # 匯出紀錄按鈕 (修改後版本)
         if st.button("💾 匯出本週紀錄 (CSV)"):
-            # ... (原本的 export_data 與 df_export 產生邏輯保持不變) ...
-            
-            # 取得今天的日期並格式化
-            today = datetime.date.today().strftime("%Y-%m-%d")
-            file_name = f"{today}_{selected_class}.csv"
+            export_data = []
+            for name in df_class["姓名"]:
+                row = df_class[df_class['姓名'] == name].iloc[0]
+                export_data.append({
+                    "班級": int(row['班級']),
+                    "座號": int(row['座號']),
+                    "姓名": row['姓名'],
+                    "出席": st.session_state[f'attendance_{selected_class}'][name],
+                    "發言次數": st.session_state[f'scores_{selected_class}'][name],
+                    "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳"
+                })
             
             df_export = pd.DataFrame(export_data)
             csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
             
-            # 修改這裡：使用動態的 file_name
+            # --- 關鍵修改處：動態產生檔名 ---
+            today = datetime.date.today().strftime("%Y-%m-%d")
+            file_name = f"{today}_{selected_class}.csv"
+            
             st.download_button("📥 點擊下載 CSV", csv, file_name, "text/csv")
-# --- 顯示歷史紀錄 ---
-        st.divider()
-        st.subheader("📊 20 週歷史紀錄")
-        if not history_df.empty:
-            st.dataframe(history_df, use_container_width=True)
-        else:
-            st.info("請確認「總資料庫」的 CSV 連結已設定正確，或目前尚無歷史紀錄。")
