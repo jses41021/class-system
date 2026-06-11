@@ -132,22 +132,39 @@ if not all_df.empty:
             today = datetime.date.today().strftime("%Y-%m-%d")
             file_name = f"{today}_{selected_class}.csv"
             
-            st.download_button("📥 點擊下載 CSV", csv, file_name, "text/csv")
-# --- 在 tab4 的最後面，加上顯示歷史表格的語法 ---
+# --- 放在第 135 行之後 ---
         st.divider()
-        st.subheader("📊 20 週歷史紀錄")
+        st.subheader("📊 20 週歷史紀錄與統計")
         
-        # 呼叫剛寫好的讀取函式
+        # 呼叫讀取函式
         history_df = load_history()
         
         if not history_df.empty:
-            # 確保篩選出的班級型態與 history_df 中的班級欄位型態一致
-            # 如果還是顯示空白，可以嘗試把 str(int(selected_class)) 換成 selected_class
+            # 確保欄位型態一致以便篩選
+            history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
             class_history = history_df[history_df["班級"] == int(selected_class)]
             
             if not class_history.empty:
+                # 顯示明細表格
+                st.write("### 歷史明細資料")
                 st.dataframe(class_history, use_container_width=True)
+                
+                # 自動加總統計
+                st.write("### 個人累積統計總表")
+                stats = class_history.groupby('姓名').agg({
+                    '出席': 'sum', 
+                    '發言次數': 'sum'
+                }).reset_index()
+                
+                # 處理繳費狀態（只要有一次未繳就標記為未繳）
+                payment_stats = class_history.groupby('姓名')['繳費狀態'].apply(
+                    lambda x: '已繳' if all(x == '已繳') else '未繳'
+                ).reset_index()
+                
+                # 合併結果並顯示
+                final_stats = pd.merge(stats, payment_stats, on='姓名')
+                st.dataframe(final_stats, use_container_width=True)
             else:
-                st.info(f"{selected_class} 班目前尚無歷史紀錄。")
+                st.info(f"{selected_class} 班目前尚未有歷史紀錄。")
         else:
-            st.info("尚無歷史紀錄，或請確認「總資料庫」CSV 連結設定正確。")
+            st.info("尚無歷史紀錄，請確認「總資料庫」的發布連結是否正確。")
