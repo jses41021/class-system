@@ -133,3 +133,21 @@ if not all_df.empty:
             file_name = f"{today}_{selected_class}.csv"
             
             st.download_button("📥 點擊下載 CSV", csv, file_name, "text/csv")
+# --- 在 tab4 的最後面，加上顯示歷史表格的語法 ---
+        st.divider()
+        st.subheader("📊 20 週歷史紀錄")
+        
+        # 呼叫剛寫好的讀取函式
+        history_df = load_history()
+        
+        if not history_df.empty:
+            # 確保篩選出的班級型態與 history_df 中的班級欄位型態一致
+            # 如果還是顯示空白，可以嘗試把 str(int(selected_class)) 換成 selected_class
+            class_history = history_df[history_df["班級"] == int(selected_class)]
+            
+            if not class_history.empty:
+                st.dataframe(class_history, use_container_width=True)
+            else:
+                st.info(f"{selected_class} 班目前尚無歷史紀錄。")
+        else:
+            st.info("尚無歷史紀錄，或請確認「總資料庫」CSV 連結設定正確。")
