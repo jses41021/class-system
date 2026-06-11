@@ -8,7 +8,7 @@ st.title("🍎 班級經營系統")
 @st.cache_data(ttl=600)
 def load_data():
     # 這裡請替換為您正確的 CSV 發佈連結
-    url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pubhtml?gid=0&single=true" 
+    url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv" 
     return pd.read_csv(url)
 
 all_df = load_data()
