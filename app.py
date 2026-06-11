@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import datetime  # <--- 請務必加上這一行
+import datetime  # 務必加上這行，否則匯出時會報錯
 
 # --- 設定頁面 ---
 st.set_page_config(layout="wide")
