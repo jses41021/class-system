@@ -36,22 +36,25 @@ if not all_df.empty:
 
     with tab2:
         st.subheader("隨機抽籤與發言統計")
-        # 抽籤按鈕移到上方
+        
+        # 建立姓名對應詳細資料的字典
+        name_to_info = {row['姓名']: f"{row['班級']}-{row['座號']}-{row['姓名']}" for _, row in df_class.iterrows()}
+        
         if st.button("🎲 隨機抽籤 (僅限出席者)"):
             if present_students:
                 winner = pd.Series(present_students).sample(1).iloc[0]
                 st.session_state[f'scores_{selected_class}'][winner] += 1
                 st.balloons()
-                st.success(f"🎉 抽中：{winner}")
+                st.success(f"🎉 抽中：{name_to_info[winner]}") # 這裡顯示完整格式
             else:
                 st.warning("沒有學生出席！")
         
         st.write("---")
-        # 主動加分清單
         for name in present_students:
             col1, col2 = st.columns([3, 1])
             score = st.session_state[f'scores_{selected_class}'][name]
-            col1.write(f"{name} (累積：{score} 次)")
+            # 這裡顯示完整格式
+            col1.write(f"{name_to_info[name]} (累積：{score} 次)") 
             if col2.button("加分", key=f"btn_{name}"):
                 st.session_state[f'scores_{selected_class}'][name] += 1
                 st.rerun()
@@ -66,6 +69,8 @@ if not all_df.empty:
                     random_list = pd.Series(present_students).sample(frac=1).tolist()
                     groups = [random_list[i::n] for i in range(n)]
                     for g_idx, group in enumerate(groups):
-                        st.write(f"第 {g_idx+1} 組: {', '.join(group)}")
+                        # 轉換成完整格式顯示
+                        full_names = [name_to_info[n] for n in group]
+                        st.write(f"第 {g_idx+1} 組: {', '.join(full_names)}")
                 else:
                     st.error("出席人數不足以分組")
