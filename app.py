@@ -17,7 +17,7 @@ def load_data():
 @st.cache_data(ttl=600)
 def load_history():
     # 當您在 Google Sheet 發布 CSV 後，將連結貼在這裡
-    history_url = "您的歷史紀錄總表_CSV公開連結" 
+    history_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVhobz_uXg7PcjS9BJh0kKh2KosiFnPLAyQq8hiGVPxuQIwCrJVU6pcyYLOukIY2hQIB2e8qXROmBu/pub?output=csv" 
     try: return pd.read_csv(history_url)
     except: return pd.DataFrame()
 
