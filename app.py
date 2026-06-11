@@ -15,7 +15,17 @@ def load_data():
         return pd.DataFrame()
 
 all_df = load_data()
+# --- 新增讀取歷史資料的功能 ---
+@st.cache_data(ttl=600)
+def load_history():
+    # 這裡是您的「總資料庫」發布至網路的 CSV 網址
+    history_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVhobz_uXg7PcjS9BJh0kKh2KosiFnPLAyQq8hiGVPxuQIwCrJVU6pcyYLOukIY2hQIB2e8qXROmBu/pub?output=csv" 
+    try:
+        return pd.read_csv(history_url)
+    except:
+        return pd.DataFrame()
 
+history_df = load_history()
 if not all_df.empty:
     selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
     df_class = all_df[all_df["班級"] == selected_class].copy()
