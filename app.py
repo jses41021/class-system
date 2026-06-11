@@ -40,31 +40,56 @@ if not all_df.empty:
 
     present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
 
+    # 抽籤與發言統計區塊 (替換原本的 tab2 內容)
     with tab2:
         st.subheader("隨機抽籤與發言統計")
+        
+        # 建立顯示名稱與原始姓名的映射 (供抽籤與加分使用)
+        # 確保顯示格式為：班級-座號-姓名
+        def get_display_name(row):
+            return f"{int(row['班級'])}-{int(row['座號'])}-{row['姓名']}"
+
+        # 抽籤按鈕移到上方
         if st.button("🎲 隨機抽籤 (僅限出席者)"):
             if present_students:
-                winner = pd.Series(present_students).sample(1).iloc[0]
-                st.session_state[f'scores_{selected_class}'][winner] += 1
+                winner_name = pd.Series(present_students).sample(1).iloc[0]
+                st.session_state[f'scores_{selected_class}'][winner_name] += 1
                 st.balloons()
-                st.success(f"🎉 抽中：{winner}")
+                # 取得該生的完整資料列以顯示名稱
+                winner_row = df_class[df_class['姓名'] == winner_name].iloc[0]
+                st.success(f"🎉 抽中：{get_display_name(winner_row)}")
                 st.rerun()
+            else:
+                st.warning("目前沒有學生出席！")
         
+        st.write("---")
+        
+        # 主動加分清單 (顯示格式：班級-座號-姓名)
         for name in present_students:
             col1, col2 = st.columns([3, 1])
+            score = st.session_state[f'scores_{selected_class}'].get(name, 0)
             row = df_class[df_class['姓名'] == name].iloc[0]
-            score = st.session_state[f'scores_{selected_class}'][name]
             col1.write(f"{get_display_name(row)} (累積：{score} 次)")
             if col2.button("加分", key=f"btn_{name}"):
                 st.session_state[f'scores_{selected_class}'][name] += 1
                 st.rerun()
 
+    # 分組區塊 (替換原本的 tab3 內容)
     with tab3:
         st.subheader("隨機分組 (僅限出席者)")
-        for n in [3, 4, 5, 6, 8]:
-            if st.button(f"{n} 組"):
-                shuffled = pd.Series(present_students).sample(frac=1).tolist()
-                groups = [shuffled[i::n] for i in range(n)]
-                for i, g in enumerate(groups):
-                    display_list = [get_display_name(df_class[df_class['姓名']==name].iloc[0]) for name in g]
-                    st.write(f"第 {i+1} 組: {', '.join(display_list)}")
+        cols = st.columns(5)
+        nums = [3, 4, 5, 6, 8]
+        for i, n in enumerate(nums):
+            if cols[i].button(f"{n} 組"):
+                if len(present_students) >= n:
+                    random_list = pd.Series(present_students).sample(frac=1).tolist()
+                    groups = [random_list[i::n] for i in range(n)]
+                    for g_idx, group in enumerate(groups):
+                        # 轉換為班級-座號-姓名顯示
+                        full_names = []
+                        for name in group:
+                            row = df_class[df_class['姓名'] == name].iloc[0]
+                            full_names.append(get_display_name(row))
+                        st.write(f"第 {g_idx+1} 組: {', '.join(full_names)}")
+                else:
+                    st.error("出席人數不足以分組")
