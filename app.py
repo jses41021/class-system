@@ -132,12 +132,10 @@ if not all_df.empty:
             today = datetime.date.today().strftime("%Y-%m-%d")
             file_name = f"{today}_{selected_class}.csv"
             
-# --- 放在第 135 行之後 ---
 # --- 放在第 135 行 (st.download_button) 之後 ---
         st.divider()
         st.subheader("📊 20 週歷史紀錄與統計")
         
-        # 載入歷史資料
         history_df = load_history()
         
         if not history_df.empty:
@@ -150,13 +148,13 @@ if not all_df.empty:
                 st.write("### 歷史明細資料")
                 st.dataframe(class_history, use_container_width=True)
                 
-                # 2. 個人累積統計總表
+                # 2. 個人累積統計總表 (自動統計)
                 st.write("### 個人累積統計總表")
                 
                 # 計算：統計缺席與發言次數
                 stats = class_history.groupby(['班級', '座號', '姓名']).agg({
-                    '出席': lambda x: (x == '缺席').sum(), 
-                    '發言次數': 'sum'
+                    '出席狀態': lambda x: (x == '缺席').sum(), 
+                    '主動發言次數': 'sum'
                 }).reset_index()
                 
                 # 獲取最新繳費狀態 (按日期取最後一筆)
