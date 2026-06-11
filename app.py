@@ -1,112 +1,62 @@
 import streamlit as st
 import pandas as pd
-import requests
+import random
 
-# 1. 設定區 (請務必更換為您的網址)
-CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
-GAS_URL = "https://script.google.com/macros/s/AKfycbzR2K6nyJvCtq1JrUsAQJ1h8NjzuJU9erW3tpKX1G41GcH1xx6mLVqyU8F_8iQOqhTi8w/exec"
+# 假設資料來源 (您之後可替換為讀取 CSV 的函數)
+if 'students' not in st.session_state:
+    st.session_state['students'] = pd.DataFrame({
+        "座號": range(1, 21),
+        "姓名": [f"學生{i}" for i in range(1, 21)],
+        "被抽次數": 0,
+        "出席": True,
+        "繳費": False
+    })
 
-st.set_page_config(page_title="班級經營全功能系統", layout="wide")
-st.title("🍎 班級經營全功能系統")
+df = st.session_state['students']
 
-# 讀取名單功能
-@st.cache_data(ttl=600) # 每10分鐘更新一次名單
-def load_data():
-    try:
-        df = pd.read_csv(CSV_URL)
-        return df
-    except:
-        return pd.DataFrame(columns=["班級", "座號", "姓名"])
+st.title("🍎 班級經營系統")
+tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 隨機分組", "💰 繳費"])
 
-df_all = load_data()
-
-# 側邊欄：選擇班級
-all_classes = df_all["班級"].unique() if not df_all.empty else []
-selected_class = st.sidebar.selectbox("請選擇操作班級", all_classes)
-
-# 篩選出該班級學生
-if selected_class:
-    class_students = df_all[df_all["班級"] == selected_class].copy()
-else:
-    class_students = pd.DataFrame()
-
-# 建立分頁
-tab1, tab2, tab3 = st.tabs(["📊 快速點名", "🎲 抽籤互動", "💰 繳費管理"])
-
-# --- Tab 1: 快速點名 ---
+# 1. 快速打勾點名
 with tab1:
-    st.subheader(f"【{selected_class}】全班點名 (預設出席)")
-    if not class_students.empty:
-        # 準備點名表格：加入「狀態」欄位並預設出席
-        class_students["狀態"] = "出席"
-        
-        edited_df = st.data_editor(
-            class_students[["座號", "姓名", "狀態"]],
-            column_config={
-                "狀態": st.column_config.SelectboxColumn("狀態", options=["出席", "缺席", "遲到"], required=True)
-            },
-            hide_index=True,
-            key="attendance_editor"
-        )
-        
-        if st.button("送出整班點名紀錄"):
-            with st.spinner("傳送中..."):
-                for _, row in edited_df.iterrows():
-                    payload = {
-                        "action": "record_attendance",
-                        "class_name": str(selected_class),
-                        "seat": int(row["座號"]),
-                        "name": row["姓名"],
-                        "status": row["狀態"],
-                        "payment": "-"
-                    }
-                    requests.post(GAS_URL, json=payload)
-                st.success(f"{selected_class} 點名紀錄已成功同步！")
-    else:
-        st.warning("請先在側邊欄選擇班級或檢查名單網址。")
+    st.subheader("點名 (預設出席，取消勾選為缺席)")
+    edited_df = st.data_editor(df[["座號", "姓名", "出席"]], hide_index=True)
+    if st.button("確認點名"):
+        st.session_state['students']['出席'] = edited_df['出席']
+        st.success("點名已儲存")
 
-# --- Tab 2: 抽籤互動 ---
+# 2. 抽籤與發言 (機率加權)
 with tab2:
-    st.subheader("隨機抽籤與發言紀錄")
-    if not class_students.empty:
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🎲 隨機抽一位學生"):
-                lucky_one = class_students.sample(1).iloc[0]
-                st.balloons()
-                st.header(f"中獎者：{lucky_one['座號']}號 {lucky_one['姓名']}")
-                st.session_state['last_drawn'] = lucky_one['姓名']
-                st.session_state['last_drawn_seat'] = lucky_one['座號']
+    st.subheader("機率加權抽籤")
+    # 權重計算：次數越高，權重越低 (1 / (次數 + 1))
+    weights = 1 / (df['被抽次數'] + 1)
+    if st.button("抽一位同學"):
+        winner = df.sample(1, weights=weights)
+        st.success(f"抽中：{winner.iloc[0]['姓名']}")
+        st.session_state['students'].loc[winner.index, '被抽次數'] += 1
+    
+    st.write("---")
+    st.subheader("主動發言計次")
+    target = st.selectbox("選擇學生", df['姓名'])
+    if st.button("計入發言一次"):
+        idx = df[df['姓名'] == target].index
+        st.session_state['students'].loc[idx, '被抽次數'] += 1
+        st.rerun()
 
-        with col2:
-            if 'last_drawn' in st.session_state:
-                st.write(f"紀錄對象：{st.session_state['last_drawn']}")
-                comment = st.text_input("備註 (如：回答正確、加分)")
-                if st.button("確認儲存發言紀錄"):
-                    payload = {
-                        "action": "record_draw",
-                        "class_name": str(selected_class),
-                        "seat": int(st.session_state['last_drawn_seat']),
-                        "name": st.session_state['last_drawn'],
-                        "result": comment if comment else "抽籤發言"
-                    }
-                    requests.post(GAS_URL, json=payload)
-                    st.success("紀錄已存入 Sheet！")
-
-# --- Tab 3: 繳費管理 ---
+# 3. 隨機分組
 with tab3:
-    st.subheader("各項費用繳交狀況")
-    fee_name = st.text_input("項目名稱", value="材料費")
-    if not class_students.empty:
-        class_students["繳費狀態"] = "未繳"
-        pay_df = st.data_editor(
-            class_students[["座號", "姓名", "繳費狀態"]],
-            column_config={
-                "繳費狀態": st.column_config.SelectboxColumn("狀態", options=["已繳", "未繳"], required=True)
-            },
-            hide_index=True,
-            key="pay_editor"
-        )
-        if st.button("儲存繳費紀錄"):
-            # 這裡可以根據您的 GAS 邏輯調整，通常也是傳送至 Sheet
-            st.info("功能測試中：此按鈕可串接至您的收費分頁")
+    st.subheader("隨機分組")
+    num_groups = st.selectbox("選擇分組數量", [3, 4, 5, 6, 8])
+    if st.button("開始分組"):
+        shuffled = df['姓名'].sample(frac=1).tolist()
+        groups = [shuffled[i::num_groups] for i in range(num_groups)]
+        for i, group in enumerate(groups):
+            st.write(f"第 {i+1} 組: {', '.join(group)}")
+
+# 4. 繳費清單
+with tab4:
+    st.subheader("繳費管理 (預設未繳)")
+    pay_df = st.data_editor(df[["座號", "姓名", "繳費"]], hide_index=True)
+    if st.button("儲存繳費"):
+        st.session_state['students']['繳費'] = pay_df['繳費']
+        st.success("繳費狀態已更新")
