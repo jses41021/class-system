@@ -30,7 +30,8 @@ if not all_df.empty:
     if f'scores_{selected_class}' not in st.session_state:
         st.session_state[f'scores_{selected_class}'] = {name: 0 for name in df_class["姓名"]}
 
-    tab1, tab2, tab3 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組"])
+   # 將原本的三個 tab 改為四個
+tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
 
     with tab1:
         st.subheader(f"{selected_class} 點名 (打勾代表出席)")
