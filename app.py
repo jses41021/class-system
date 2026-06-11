@@ -15,6 +15,22 @@ def load_data():
         return pd.DataFrame()
 
 all_df = load_data()
+# --- 新增：讀取 20 週歷史紀錄 ---
+@st.cache_data(ttl=600)
+def load_history():
+    # 這裡放您未來存放 20 週資料的 Google Sheet CSV 公開連結
+    history_url = "您的歷史紀錄表CSV公開連結" 
+    try:
+        return pd.read_csv(history_url)
+    except:
+        return pd.DataFrame()
+
+# 在 main 區塊中加入以下顯示邏輯
+history_df = load_history()
+if not history_df.empty:
+    with tab4:
+        st.subheader("📊 20 週歷史紀錄總覽")
+        st.dataframe(history_df) # 這樣您就可以在網頁上直接看到過去的累積資料
 
 if not all_df.empty:
     selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
