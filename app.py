@@ -1,41 +1,46 @@
 import streamlit as st
+import pandas as pd
 import requests
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 
-# Google Sheet 讀取設定 (這裡需要設定權限)
-def get_student_list():
-    # 這是為了讓程式能連結到您的 Sheet
-    # 實際運作時，您需要將憑證 JSON 檔設定在 Streamlit 的 Secrets 中
-    # 為求簡單，我們暫時先用一個模擬的讀取邏輯
-    return ["王玫鈞", "田宇豪", "吳克宸", "林秉寬", "姜睿謙"] # 之後可替換為實際讀取 Sheet 的代碼
+# 您的 GAS 網址 (請確認已更換為您實際的網址)
+GAS_URL = "https://script.google.com/macros/s/AKfycbzR2K6nyJvCtq1JrUsAQJ1h8NjzuJU9erW3tpKX1G41GcH1xx6mLVqyU8F_8iQOqhTi8w/exec"
 
-st.set_page_config(page_title="班級經營系統", layout="centered")
-st.title("👨‍🏫 班級經營系統")
+st.set_page_config(page_title="班級經營系統", layout="wide")
+st.title("👨‍🏫 班級經營系統 - 快速點名")
 
-tabs = st.tabs(["📊 點名/繳費", "🎲 抽籤/發言"])
+# 模擬從 Sheet 讀取到的全班名單
+# 您之後可以改寫這裡，讓它讀取您的 Google Sheet
+data = {
+    "座號": [1, 2, 3, 4, 5],
+    "姓名": ["王玫鈞", "田宇豪", "吳克宸", "林秉寬", "姜睿謙"],
+    "狀態": ["出席"] * 5  # 預設全體出席
+}
+df = pd.DataFrame(data)
 
-with tabs[0]:
-    st.subheader("點名與繳費記錄")
-    cls = st.text_input("輸入班級", key="c1")
-    # 直接使用函數讀取名單
-    name = st.selectbox("選擇學生", get_student_list(), key="n1")
-    status = st.selectbox("出席狀態", ["出席", "缺席", "遲到"], key="s1")
-    pay = st.selectbox("繳費狀態", ["已繳", "未繳"], key="p1")
-    
-    if st.button("儲存點名資料", key="b1"):
-        # 請確保這裡的 GAS_URL 是您正確的網址
-        GAS_URL = "https://script.google.com/macros/s/AKfycbzR2K6nyJvCtq1JrUsAQJ1h8NjzuJU9erW3tpKX1G41GcH1xx6mLVqyU8F_8iQOqhTi8w/exec"
-        data = {"action": "record_attendance", "class_name": cls, "name": name, "status": status, "payment": pay}
-        requests.post(GAS_URL, json=data)
-        st.success(f"{name} 的資料已送出！")
+# 使用 data_editor 呈現表格，讓您可以直接在網頁上點選修改
+edited_df = st.data_editor(
+    df,
+    column_config={
+        "狀態": st.column_config.SelectboxColumn(
+            "狀態",
+            options=["出席", "缺席", "遲到"],
+            required=True,
+        )
+    },
+    hide_index=True,
+)
 
-with tabs[1]:
-    st.subheader("課堂互動記錄")
-    cls_d = st.text_input("輸入班級", key="c2")
-    name_d = st.selectbox("選擇發言學生", get_student_list(), key="n2")
-    if st.button("記錄發言", key="b2"):
-        GAS_URL = "https://script.google.com/macros/s/AKfycbzR2K6nyJvCtq1JrUsAQJ1h8NjzuJU9erW3tpKX1G41GcH1xx6mLVqyU8F_8iQOqhTi8w/exec"
-        data = {"action": "record_draw", "class_name": cls_d, "name": name_d, "result": "發言"}
-        requests.post(GAS_URL, json=data)
-        st.success(f"{name_d} 的發言已記錄！")
+if st.button("送出整班點名紀錄"):
+    # 將表格資料轉換為 JSON 發送給 GAS
+    records = edited_df.to_dict(orient="records")
+    for record in records:
+        payload = {
+            "action": "record_attendance",
+            "class_name": "301",
+            "seat": record["座號"],
+            "name": record["姓名"],
+            "status": record["狀態"],
+            "payment": "已繳"
+        }
+        requests.post(GAS_URL, json=payload)
+    st.success("整班點名紀錄已成功同步至 Google Sheet！")
