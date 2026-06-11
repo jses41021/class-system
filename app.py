@@ -90,6 +90,15 @@ if not all_df.empty:
         for _, row in df_class.iterrows():
             name = row['姓名']
             st.session_state[f'payment_{selected_class}'][name] = st.checkbox(get_display_name(row), value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
-        
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# 設定寫入功能
+def update_google_sheet(row_index, col_name, value):
+    # 這裡會使用您的 API 金鑰連接 Google Sheet
+    # 建議將金鑰存放在 GitHub 的 Secrets 中以保證安全性
+    scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets']
+    # ... (設定憑證與連結邏輯) ...
+    # sheet.update_cell(row_index, col_index, value)        
         paid_count = sum(st.session_state[f'payment_{selected_class}'].values())
         st.info(f"💰 繳費統計：共 {len(df_class)} 人，已繳 {paid_count} 人，未繳 {len(df_class) - paid_count} 人")
