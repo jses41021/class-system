@@ -81,9 +81,24 @@ if not all_df.empty:
                         st.write(f"第 {g_idx+1} 組: {', '.join(full_names)}")
     with tab4:
         st.subheader(f"{selected_class} 繳費管理")
-        # ... (原本的繳費勾選迴圈維持不變) ...
         
-        # 匯出紀錄按鈕 (修改此區塊)
+        # 顯示名單與勾選框 (這段是關鍵，必須確保在 with tab4 之下)
+        for _, row in df_class.iterrows():
+            name = row['姓名']
+            # 使用 key 以確保每個勾選框獨立
+            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(
+                f"{int(row['班級'])}-{int(row['座號'])}-{row['姓名']}", 
+                value=st.session_state[f'payment_{selected_class}'][name], 
+                key=f"pay_{name}"
+            )
+        
+        # 計算統計數字
+        paid_count = sum(st.session_state[f'payment_{selected_class}'].values())
+        st.info(f"💰 繳費統計：共 {len(df_class)} 人，已繳 {paid_count} 人，未繳 {len(df_class) - paid_count} 人")
+        
+        st.write("---")
+        
+        # 匯出紀錄按鈕 (欄位已拆分)
         if st.button("💾 匯出本週紀錄 (CSV)"):
             export_data = []
             for name in df_class["姓名"]:
@@ -97,7 +112,6 @@ if not all_df.empty:
                     "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳"
                 })
             df_export = pd.DataFrame(export_data)
-            # 使用 utf-8-sig 編碼，確保 Excel 打開不會亂碼
-            csv = df_export.to_csv(index=False).encode('utf-8-sig')
-            st.download_button("📥 點擊下載 CSV (欄位已拆分)", csv, f"{selected_class}_紀錄.csv", "text/csv")
+            csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+            st.download_button("📥 點擊下載 CSV", csv, f"{selected_class}_紀錄.csv", "text/csv")
 
