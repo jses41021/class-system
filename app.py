@@ -134,37 +134,41 @@ if not all_df.empty:
             
 # --- 放在第 135 行之後 ---
         st.divider()
+# --- 顯示歷史紀錄與統計 (放在 135 行 st.download_button 之後) ---
+        st.divider()
         st.subheader("📊 20 週歷史紀錄與統計")
         
-        # 呼叫讀取函式
         history_df = load_history()
         
         if not history_df.empty:
-            # 確保欄位型態一致以便篩選
+            # 確保班級欄位為數字以便比對
             history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
             class_history = history_df[history_df["班級"] == int(selected_class)]
             
             if not class_history.empty:
-                # 顯示明細表格
+                # 1. 顯示歷史明細 (這部分您原本就有)
                 st.write("### 歷史明細資料")
                 st.dataframe(class_history, use_container_width=True)
                 
-                # 自動加總統計
+                # 2. 個人累積統計總表 (修正邏輯)
                 st.write("### 個人累積統計總表")
-                stats = class_history.groupby('姓名').agg({
-                    '出席': 'sum', 
+                
+                # 計算「缺席總次數」與「發言總次數」
+                stats = class_history.groupby(['座號', '姓名']).agg({
+                    '出席': lambda x: (x == '缺席').sum(), 
                     '發言次數': 'sum'
                 }).reset_index()
                 
-                # 處理繳費狀態（只要有一次未繳就標記為未繳）
-                payment_stats = class_history.groupby('姓名')['繳費狀態'].apply(
-                    lambda x: '已繳' if all(x == '已繳') else '未繳'
-                ).reset_index()
+                # 獲取「最後一次」的繳費狀態
+                latest_payment = class_history.sort_values('日期').groupby('姓名').tail(1)[['姓名', '繳費狀態']]
                 
-                # 合併結果並顯示
-                final_stats = pd.merge(stats, payment_stats, on='姓名')
-                st.dataframe(final_stats, use_container_width=True)
+                # 合併統計與最新繳費狀態
+                final_stats = pd.merge(stats, latest_payment, on='姓名')
+                final_stats.columns = ['座號', '姓名', '缺席總次數', '發言總次數', '最新繳費狀態']
+                
+                # 顯示統計表
+                st.dataframe(final_stats.sort_values('座號'), use_container_width=True)
             else:
-                st.info(f"{selected_class} 班目前尚未有歷史紀錄。")
+                st.info(f"{selected_class} 班目前尚無歷史紀錄。")
         else:
-            st.info("尚無歷史紀錄，請確認「總資料庫」的發布連結是否正確。")
+            st.info("尚無歷史紀錄，請確認「總資料庫」CSV 連結設定正確。")
