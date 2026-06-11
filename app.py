@@ -19,7 +19,7 @@ all_df = load_data()
 @st.cache_data(ttl=600)
 def load_history():
     # 這裡是您的「總資料庫」發布至網路的 CSV 網址
-    history_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVhobz_uXg7PcjS9BJh0kKh2KosiFnPLAyQq8hiGVPxuQIwCrJVU6pcyYLOukIY2hQIB2e8qXROmBu/pub?output=csv" 
+    history_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVhobz_uXg7PcjS9BJh0kKh2KosiFnPLAyQq8hiGVPxuQIwCrJVU6pcyYLOukIY2hQIB2e8qXROmBu/pub?gid=1041522227&single=true&output=csv" 
     try:
         return pd.read_csv(history_url)
     except:
