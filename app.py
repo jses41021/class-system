@@ -1,18 +1,33 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import requests  # 確保這裡有引入
+import requests
+import io  # 👈 務必確保上方有 import io
 
-# --- 1. 定義所有函式 (只定義一次) ---
+# --- 修正後的載入函式 ---
 @st.cache_data(ttl=600)
 def load_data():
-    # 這裡放名單的 CSV 網址
-    return pd.read_csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv")
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        response = requests.get(csv_url, headers=headers)
+        if response.status_code == 200:
+            return pd.read_csv(io.StringIO(response.text))
+    except:
+        pass
+    return pd.DataFrame()
 
 @st.cache_data(ttl=600)
 def load_history():
-    # 這裡放總資料庫的 CSV 網址
-    return pd.read_csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv")
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        response = requests.get(csv_url, headers=headers)
+        if response.status_code == 200:
+            return pd.read_csv(io.StringIO(response.text))
+    except:
+        pass
+    return pd.DataFrame()
 
 def save_to_google_sheet(data):
     api_url = "https://script.google.com/macros/s/AKfycbwRTMwukxZx8JBD76jWMtrGdpT6lG7gU_8qtzoNXUSSsPPEMN-TaTalZ9tTc33F0KtYvA/exec" # 請填入您的真實網址
