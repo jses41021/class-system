@@ -35,16 +35,14 @@ else:
     df_class = all_df[all_df["班級"] == selected_class].copy()
     
     # 初始化 session_state
-    def get_display_name(row):
-        return f"{int(row['班級'])}-{int(row['座號'])}-{row['姓名']}"
-
     if f'attendance_{selected_class}' not in st.session_state:
         st.session_state[f'attendance_{selected_class}'] = {name: True for name in df_class["姓名"]}
         st.session_state[f'scores_{selected_class}'] = {name: 0 for name in df_class["姓名"]}
         st.session_state[f'payment_{selected_class}'] = {name: False for name in df_class["姓名"]}
         st.session_state[f'last_winner_{selected_class}'] = None
 
-   tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
+    # --- Tabs 區塊 ---
+    tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
 
     with tab1:
         st.subheader("點名 (勾選代表出席)")
@@ -115,7 +113,5 @@ else:
     st.divider()
     st.subheader("📊 20 週歷史紀錄與統計")
     if not history_df.empty:
-        # 請確保這裡的欄位名稱跟你的 Google Sheet 標題完全一致
         class_history = history_df[history_df["班級"] == int(selected_class)]
         st.dataframe(class_history)
-        # (這裡放入你的統計計算邏輯)
