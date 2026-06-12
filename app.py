@@ -159,7 +159,7 @@ else:
      # --- 新增：整合 Google Apps Script 寫入功能 ---
         if st.button("💾 儲存今日紀錄至總資料庫"):
             # 這是你從 Google Apps Script 部署得到的網頁應用程式網址
-            WEB_APP_URL = "請貼上你部署後獲得的網址" 
+            WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec" 
             
             with st.spinner("正在寫入資料到總資料庫..."):
                 for name in df_class["姓名"]:
