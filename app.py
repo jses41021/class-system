@@ -12,7 +12,7 @@ def load_data():
 @st.cache_data(ttl=600)
 def load_history():
     # 這裡放總資料庫的 CSV 網址
-    return pd.read_csv("您的總資料庫CSV網址")
+    return pd.read_csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv")
 
 def save_to_google_sheet(data):
     api_url = "https://script.google.com/macros/s/AKfycbwRTMwukxZx8JBD76jWMtrGdpT6lG7gU_8qtzoNXUSSsPPEMN-TaTalZ9tTc33F0KtYvA/exec" # 請填入您的真實網址
