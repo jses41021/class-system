@@ -94,7 +94,9 @@ else:
             )
         
         if st.button("💾 儲存今日紀錄"):
+    # 下面這一行要比 if 多一個縮排層級
     with st.spinner("正在批次同步，請稍候..."):
+        # 下面這一行要比 with 多一個縮排層級
         all_data = []
         for name in df_class["姓名"]:
             row = df_class[df_class['姓名'] == name].iloc[0]
