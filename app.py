@@ -109,36 +109,21 @@ else:
                     requests.post(WEB_APP_URL, json=payload)
                 st.success("✅ 同步完成！")
 
-# --- 歷史統計 ---
-    st.divider()
-    st.subheader("📊 20 週歷史紀錄與統計")
+# --- 歷史統計計算區塊 ---
+if not class_history.empty:
+    # 1. 將相關數字欄位強制轉為數值型態，並將空值補 0
+    numeric_cols = ['發言次數', '中籤次數']
+    for col in numeric_cols:
+        class_history[col] = pd.to_numeric(class_history[col], errors='coerce').fillna(0)
     
-    if not history_df.empty:
-        # 1. 確保班級欄位為純數字，解決無法篩選的問題
-        history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
-        
-        # 2. 篩選該班級的歷史資料
-        class_history = history_df[history_df["班級"] == int(selected_class)].copy()
-        
-        # 顯示總筆數供確認
-        st.write(f"系統已讀取到該班級共 {len(class_history)} 筆歷史紀錄")
-        
-        if not class_history.empty:
-            # 3. 顯示明細表格
-            st.dataframe(class_history, use_container_width=True)
-            
-            # 4. 統計計算 (請根據你 Google Sheet 的實際名稱修改)
-            # 假設欄位名稱為 "發言次數"
-            # 正確對應 Sheet 中的欄位名稱
-            st.write("### 個人累積統計表")
-            stats = class_history.groupby(['座號', '姓名']).agg({
-                '出席狀態': lambda x: (x == '出席').sum(),
-                '發言次數': 'sum',  # 改回這裡的正確名稱
-                '中籤次數': 'sum'   # 如果你想統計中籤，加上這個
-            }).reset_index()
-            
-            st.dataframe(stats, use_container_width=True)
-        else:
-            st.warning("該班級目前尚未有歷史資料。")
-    else:
-        st.warning("總資料庫目前為空。")
+    # 2. 進行分組聚合統計
+    # 注意：這裡的欄位名稱必須與您的 Google Sheet 完全一致
+    stats = class_history.groupby(['座號', '姓名']).agg({
+        '出席狀態': lambda x: (x == '出席').sum(), # 計算出現次數
+        '發言次數': 'sum',
+        '中籤次數': 'sum',
+        '分組': 'last' # 假設取該生最後一次的分組記錄
+    }).reset_index()
+    
+    st.write("### 個人累積統計表")
+    st.dataframe(stats, use_container_width=True)
