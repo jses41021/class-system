@@ -44,9 +44,46 @@ else:
         st.session_state[f'payment_{selected_class}'] = {name: False for name in df_class["姓名"]}
         st.session_state[f'last_winner_{selected_class}'] = None
 
-    tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
-    
-    # ... (這裡放入你原本的 tab1~tab3 程式碼) ...
+   tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
+
+    with tab1:
+        st.subheader("點名 (勾選代表出席)")
+        for _, row in df_class.iterrows():
+            name = row['姓名']
+            st.session_state[f'attendance_{selected_class}'][name] = st.checkbox(
+                f"{int(row['座號'])} {name}", value=st.session_state[f'attendance_{selected_class}'][name]
+            )
+
+    present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
+
+    with tab2:
+        st.subheader("隨機抽籤")
+        if st.button("🎲 抽籤 (僅限出席者)"):
+            if present_students:
+                winner = pd.Series(present_students).sample(1).iloc[0]
+                st.session_state[f'last_winner_{selected_class}'] = winner
+                st.session_state[f'scores_{selected_class}'][winner] += 1
+        
+        if st.session_state[f'last_winner_{selected_class}']:
+            st.success(f"🎉 剛剛抽中：{st.session_state[f'last_winner_{selected_class}']}")
+
+        st.write("---")
+        for name in present_students:
+            col1, col2 = st.columns([3, 1])
+            col1.write(f"{name} (發言：{st.session_state[f'scores_{selected_class}'][name]} 次)")
+            if col2.button("加分", key=f"score_{name}"):
+                st.session_state[f'scores_{selected_class}'][name] += 1
+                st.rerun()
+
+    with tab3:
+        st.subheader("隨機分組")
+        group_n = st.selectbox("選擇組數", [3, 4, 5, 6, 8])
+        if st.button("開始分組"):
+            if len(present_students) >= group_n:
+                shuffled = pd.Series(present_students).sample(frac=1).tolist()
+                groups = [shuffled[i::group_n] for i in range(group_n)]
+                for i, g in enumerate(groups):
+                    st.write(f"第 {i+1} 組: {', '.join(g)}")
 
     with tab4:
         st.subheader(f"{selected_class} 繳費管理")
