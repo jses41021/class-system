@@ -6,13 +6,15 @@ import io  # 👈 務必確保上方有 import io
 
 # --- 修正後的載入函式 ---
 @st.cache_data(ttl=600)
+# 請修改您的 load_data 函式，加入 header=0
 def load_data():
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
+    csv_url = "您的連結..."
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         response = requests.get(csv_url, headers=headers)
         if response.status_code == 200:
-            return pd.read_csv(io.StringIO(response.text))
+            # 加入 header=0 確保第一行被視為標題
+            return pd.read_csv(io.StringIO(response.text), header=0) 
     except:
         pass
     return pd.DataFrame()
@@ -39,6 +41,10 @@ def save_to_google_sheet(data):
 
 # --- 2. 執行頁面邏輯 ---
 all_df = load_data()
+# --- 除錯用 ---
+st.write("讀取到的欄位名稱：", all_df.columns.tolist())
+st.write("讀取到的前幾行資料：", all_df.head())
+# ------------
 history_df = load_history()
 
 if not all_df.empty:
