@@ -3,16 +3,15 @@ import pandas as pd
 import datetime
 import requests
 import io  # 👈 務必確保上方有 import io
-
-# --- 修正後的載入函式 ---
-@st.cache_data(ttl=60)
-# --- 1. 定義載入函式 (取代原本混亂的定義) ---
 @st.cache_data(ttl=60)
 def load_data():
-    csv_url = "您的名單CSV網址" # 請填入正確網址
     try:
-        return pd.read_csv(csv_url)
-    except:
+        # 請確認這裡的網址是您「發布至網路」取得的 CSV 網址
+        url = "您的 CSV 網址"
+        df = pd.read_csv(url)
+        return df
+    except Exception as e:
+        # 如果讀取失敗，回傳一個空的 DataFrame，而不是讓程式死掉
         return pd.DataFrame()
 
 @st.cache_data(ttl=60)
