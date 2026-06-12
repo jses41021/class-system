@@ -156,25 +156,33 @@ else:
         # 匯出紀錄按鈕 (欄位已拆分)
         # 匯出紀錄按鈕 (修改處)
        # 匯出紀錄按鈕 (修改後版本)
-        if st.button("💾 匯出本週紀錄 (CSV)"):
-            export_data = []
-            for name in df_class["姓名"]:
-                row = df_class[df_class['姓名'] == name].iloc[0]
-                export_data.append({
-                    "班級": int(row['班級']),
-                    "座號": int(row['座號']),
-                    "姓名": row['姓名'],
-                    "出席": st.session_state[f'attendance_{selected_class}'][name],
-                    "發言次數": st.session_state[f'scores_{selected_class}'][name],
-                    "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳"
-                })
+     # --- 新增：整合 Google Apps Script 寫入功能 ---
+        if st.button("💾 儲存今日紀錄至總資料庫"):
+            # 這是你從 Google Apps Script 部署得到的網頁應用程式網址
+            WEB_APP_URL = "請貼上你部署後獲得的網址" 
             
-            df_export = pd.DataFrame(export_data)
-            csv = df_export.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
-            
-            # --- 關鍵修改處：動態產生檔名 ---
-            today = datetime.date.today().strftime("%Y-%m-%d")
-            file_name = f"{today}_{selected_class}.csv"
+            with st.spinner("正在寫入資料到總資料庫..."):
+                for name in df_class["姓名"]:
+                    row = df_class[df_class['姓名'] == name].iloc[0]
+                    # 準備要傳送的資料
+                    payload = {
+                        "日期": datetime.date.today().strftime("%Y/%m/%d"),
+                        "班級": int(row['班級']),
+                        "座號": int(row['座號']),
+                        "姓名": row['姓名'],
+                        "出席狀態": "出席" if st.session_state[f'attendance_{selected_class}'][name] else "缺席",
+                        "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳",
+                        "發言次數": st.session_state[f'scores_{selected_class}'][name],
+                        "中籤次數": 0, # 若未來有記錄抽籤功能可在此調整
+                        "分組": "無" # 若未來有記錄分組功能可在此調整
+                    }
+                    # 發送給 Google Sheet
+                    try:
+                        requests.post(WEB_APP_URL, json=payload)
+                    except Exception as e:
+                        st.error(f"寫入失敗: {e}")
+                
+                st.success("✅ 紀錄已成功自動同步至總資料庫！")
             
 # --- 放在第 135 行 (st.download_button) 之後 ---
         st.divider()
