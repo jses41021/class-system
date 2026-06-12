@@ -18,6 +18,25 @@ def load_data():
 @st.cache_data(ttl=60)
 def load_history():
     csv_url = "您的總資料庫CSV網址" # 請填入正確網址
+    # 修改 load_data 函式，加入錯誤處理
+@st.cache_data(ttl=60)
+def load_data():
+    # 請確保這串網址結尾有 &output=csv
+    csv_url = "您的長網址..." 
+    try:
+        df = pd.read_csv(csv_url)
+        return df
+    except Exception as e:
+        st.error(f"讀取失敗: {e}")
+        return pd.DataFrame()
+
+# 在呼叫時加上判斷
+all_df = load_data()
+if not all_df.empty:
+    selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
+    # ... 後續 UI 程式碼 ...
+else:
+    st.warning("目前讀不到學生名單，請檢查 Google Sheet 連結與發布狀態！")
     try:
         return pd.read_csv(csv_url)
     except:
