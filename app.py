@@ -8,23 +8,23 @@ st.set_page_config(layout="wide")
 st.title("🍎 班級經營系統")
 
 # --- 資料讀取函式 ---
-@st.cache_data(ttl=600)
-def load_csv(url):
+@st.cache_data(ttl=60)
+def load_data(url):
     try:
         return pd.read_csv(url)
-    except:
+    except Exception as e:
+        st.error(f"讀取錯誤: {e}")
         return pd.DataFrame()
 
-# 填入你的 CSV 網址
-ALL_STUDENTS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
-HISTORY_URL = "填入你的總資料庫CSV網址"
+all_df = load_data(STUDENT_URL)
+history_df = load_data(HISTORY_URL)
 
-all_df = load_csv(ALL_STUDENTS_URL)
-history_df = load_csv(HISTORY_URL)
+# 偵錯用：顯示是否有讀到資料
+st.write(f"學生名單筆數: {len(all_df)}")
+st.write(f"歷史資料筆數: {len(history_df)}")
 
-# --- 主邏輯 ---
 if all_df.empty:
-    st.error("⚠️ 無法讀取學生名單！請檢查第一個 Google Sheet 是否已發布。")
+    st.warning("⚠️ 學生名單讀取失敗，請檢查 CSV 網址！")
 else:
     selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
     df_class = all_df[all_df["班級"] == selected_class].copy()
