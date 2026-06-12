@@ -74,7 +74,8 @@ else:
             groups = [shuffled[i::group_n] for i in range(group_n)]
             result_str = ""
             for i, g in enumerate(groups):
-                g_str = ", ".join([f"{df_class.loc[df_class['姓名']==name, '座號'].values[0]}號 {name}" for name in g])
+                # 修改：使用 int() 確保座號不顯示 .0，並拼接為 "座號 姓名"
+                g_str = ", ".join([f"{int(df_class.loc[df_class['姓名']==name, '座號'].values[0])} {name}" for name in g])
                 res = f"第 {i+1} 組: {g_str}"
                 st.write(res)
                 result_str += res + " | "
@@ -84,7 +85,13 @@ else:
         st.subheader("繳費管理")
         for _, row in df_class.iterrows():
             name = row['姓名']
-            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(f"{int(row['座號'])} {name}", value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
+            # 修改：顯示格式統一為 "班級-座號-姓名"
+            display_name = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
+            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(
+                display_name, 
+                value=st.session_state[f'payment_{selected_class}'][name], 
+                key=f"pay_{name}"
+            )
         
         if st.button("💾 儲存今日紀錄"):
             with st.spinner("同步中..."):
@@ -97,8 +104,8 @@ else:
                         "出席狀態": "出席" if st.session_state[f'attendance_{selected_class}'][name] else "缺席",
                         "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳",
                         "發言次數": st.session_state[f'scores_{selected_class}'][name],
-                        "中籤次數": 1 if name == st.session_state[f'last_winner_{selected_class}'] else 0,
-                        "分組": st.session_state[f'group_{selected_class}']
+                        "中籤次數": 1 if name == st.session_state.get(f'last_winner_{selected_class}') else 0,
+                        "分組": st.session_state.get(f'group_{selected_class}', "無")
                     })
                 try:
                     requests.post(WEB_APP_URL, json=all_data, timeout=10)
