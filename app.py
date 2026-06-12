@@ -93,37 +93,43 @@ else:
             )
         
         if st.button("💾 儲存今日紀錄至總資料庫"):
-            WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
-            with st.spinner("正在寫入..."):
-                for name in df_class["姓名"]:
-                    row = df_class[df_class['姓名'] == name].iloc[0]
-                    payload = {
-                        "日期": datetime.date.today().strftime("%Y/%m/%d"),
-                        "班級": int(row['班級']),
-                        "座號": int(row['座號']),
-                        "姓名": row['姓名'],
-                        "出席狀態": "出席" if st.session_state[f'attendance_{selected_class}'][name] else "缺席",
-                        "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳",
-                        "發言次數": st.session_state[f'scores_{selected_class}'][name]
-                    }
-                    requests.post(WEB_APP_URL, json=payload)
-                st.success("✅ 同步完成！")
+    with st.spinner("正在處理中..."):
+        all_data = [] # 建立列表準備批次寫入
+        for name in df_class["姓名"]:
+            row = df_class[df_class['姓名'] == name].iloc[0]
+            # 準備完整的資料欄位，確保這些名稱與 Google Sheet 標題一致
+            data = {
+                "日期": datetime.date.today().strftime("%Y/%m/%d"),
+                "班級": int(row['班級']),
+                "座號": int(row['座號']),
+                "姓名": row['姓名'],
+                "出席狀態": "出席" if st.session_state[f'attendance_{selected_class}'][name] else "缺席",
+                "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳",
+                "發言次數": st.session_state[f'scores_{selected_class}'][name],
+                "中籤次數": 0, # 若你目前還沒寫入中籤邏輯，先填 0
+                "分組": "無"   # 若還沒寫入分組邏輯，先填 無
+            }
+            all_data.append(data)
+        
+        # 發送請求
+        response = requests.post(WEB_APP_URL, json=all_data)
+        st.success("✅ 同步完成！")
 
 # --- 歷史統計計算區塊 ---
 if not class_history.empty:
-    # 1. 將相關數字欄位強制轉為數值型態，並將空值補 0
-    numeric_cols = ['發言次數', '中籤次數']
-    for col in numeric_cols:
-        class_history[col] = pd.to_numeric(class_history[col], errors='coerce').fillna(0)
+    # 檢查欄位是否存在，不存在就補 0，避免 KeyError
+    for col in ['發言次數', '中籤次數', '分組']:
+        if col not in class_history.columns:
+            class_history[col] = 0
     
-    # 2. 進行分組聚合統計
-    # 注意：這裡的欄位名稱必須與您的 Google Sheet 完全一致
+    # 統計時改用 safe_agg (只計算存在的欄位)
     stats = class_history.groupby(['座號', '姓名']).agg({
-        '出席狀態': lambda x: (x == '出席').sum(), # 計算出現次數
+        '出席狀態': lambda x: (x == '出席').sum(),
         '發言次數': 'sum',
         '中籤次數': 'sum',
-        '分組': 'last' # 假設取該生最後一次的分組記錄
+        '分組': 'last'
     }).reset_index()
     
     st.write("### 個人累積統計表")
+    st.dataframe(stats, use_container_width=True)
     st.dataframe(stats, use_container_width=True)
