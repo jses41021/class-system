@@ -7,7 +7,7 @@ import requests  # 確保這裡有引入
 @st.cache_data(ttl=600)
 def load_data():
     # 這裡放名單的 CSV 網址
-    return pd.read_csv("您的名單CSV網址")
+    return pd.read_csv("https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv")
 
 @st.cache_data(ttl=600)
 def load_history():
