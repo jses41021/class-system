@@ -109,9 +109,34 @@ else:
                     requests.post(WEB_APP_URL, json=payload)
                 st.success("✅ 同步完成！")
 
-    # --- 歷史統計 ---
+# --- 歷史統計 ---
     st.divider()
     st.subheader("📊 20 週歷史紀錄與統計")
+    
     if not history_df.empty:
-        class_history = history_df[history_df["班級"] == int(selected_class)]
-        st.dataframe(class_history)
+        # 1. 確保班級欄位為純數字，解決無法篩選的問題
+        history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
+        
+        # 2. 篩選該班級的歷史資料
+        class_history = history_df[history_df["班級"] == int(selected_class)].copy()
+        
+        # 顯示總筆數供確認
+        st.write(f"系統已讀取到該班級共 {len(class_history)} 筆歷史紀錄")
+        
+        if not class_history.empty:
+            # 3. 顯示明細表格
+            st.dataframe(class_history, use_container_width=True)
+            
+            # 4. 統計計算 (請根據你 Google Sheet 的實際名稱修改)
+            # 假設欄位名稱為 "發言/抽籤次數"
+            st.write("### 個人累積統計表")
+            stats = class_history.groupby(['座號', '姓名']).agg({
+                '出席狀態': lambda x: (x == '出席').sum(),
+                '發言/抽籤次數': 'sum'  # 修正這裡的欄位名稱以匹配 Sheet
+            }).reset_index()
+            
+            st.dataframe(stats, use_container_width=True)
+        else:
+            st.warning("該班級目前尚未有歷史資料。")
+    else:
+        st.warning("總資料庫目前為空。")
