@@ -94,32 +94,31 @@ else:
             )
         
         if st.button("💾 儲存今日紀錄"):
-    # 下面這一行要比 if 多一個縮排層級
-    with st.spinner("正在批次同步，請稍候..."):
-        # 下面這一行要比 with 多一個縮排層級
-        all_data = []
-        for name in df_class["姓名"]:
-            row = df_class[df_class['姓名'] == name].iloc[0]
-            # 將這一行的資料加入列表
-            all_data.append({
-                "日期": datetime.date.today().strftime("%Y/%m/%d"),
-                "班級": int(row['班級']),
-                "座號": int(row['座號']),
-                "姓名": name,
-                "出席狀態": "出席" if st.session_state[f'attendance_{selected_class}'][name] else "缺席",
-                "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳",
-                "發言次數": st.session_state[f'scores_{selected_class}'][name],
-                "中籤次數": 1 if name == st.session_state.get(f'last_winner_{selected_class}') else 0,
-                "分組": st.session_state.get(f'group_{selected_class}', "無")
-            })
-        
-        # 關鍵點：一次傳送整份 JSON 資料
-        try:
-            # 這裡只會發送一次請求，速度會快 10 倍以上
-            response = requests.post(WEB_APP_URL, json=all_data, timeout=15)
-            st.success("✅ 全部資料已同步完成！")
-        except Exception as e:
-            st.error(f"同步失敗: {e}")
+            # 注意：這裡所有的程式碼都要縮排在 with 之下
+            with st.spinner("正在批次同步，請稍候..."):
+                all_data = []
+                for name in df_class["姓名"]:
+                    row = df_class[df_class['姓名'] == name].iloc[0]
+                    # 將這一行的資料加入列表
+                    all_data.append({
+                        "日期": datetime.date.today().strftime("%Y/%m/%d"),
+                        "班級": int(row['班級']),
+                        "座號": int(row['座號']),
+                        "姓名": name,
+                        "出席狀態": "出席" if st.session_state[f'attendance_{selected_class}'][name] else "缺席",
+                        "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳",
+                        "發言次數": st.session_state[f'scores_{selected_class}'][name],
+                        "中籤次數": 1 if name == st.session_state.get(f'last_winner_{selected_class}') else 0,
+                        "分組": st.session_state.get(f'group_{selected_class}', "無")
+                    })
+                
+                # 關鍵點：一次傳送整份 JSON 資料
+                try:
+                    # 這裡只會發送一次請求，速度會快 10 倍以上
+                    response = requests.post(WEB_APP_URL, json=all_data, timeout=15)
+                    st.success("✅ 全部資料已同步完成！")
+                except Exception as e:
+                    st.error(f"同步失敗: {e}")
 
     st.divider()
     st.subheader("📊 個人累積統計表")
