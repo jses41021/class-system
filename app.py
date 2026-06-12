@@ -7,12 +7,17 @@ import requests
 st.set_page_config(layout="wide")
 st.title("🍎 班級經營系統")
 
+# --- 設定網址 ---
+STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
+HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
+
 # --- 資料讀取函式 ---
 @st.cache_data(ttl=60)
 def load_data(url):
     try:
         return pd.read_csv(url)
     except Exception as e:
+        # 如果讀取錯誤，顯示錯誤訊息並回傳空的 DataFrame
         st.error(f"讀取錯誤: {e}")
         return pd.DataFrame()
 
