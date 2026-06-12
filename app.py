@@ -1,35 +1,34 @@
 import streamlit as st
 import pandas as pd
-import datetime  # 務必加上這行，否則匯出時會報錯
+import datetime
+import requests  # 確保這裡有引入
 
-# --- 設定頁面 ---
-st.set_page_config(layout="wide")
-st.title("🍎 班級經營系統")
-
-# --- 載入資料 ---
+# --- 1. 定義所有函式 (只定義一次) ---
 @st.cache_data(ttl=600)
 def load_data():
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
-    try:
-        return pd.read_csv(csv_url)
-    except:
-        return pd.DataFrame()
+    # 這裡放名單的 CSV 網址
+    return pd.read_csv("您的名單CSV網址")
 
-all_df = load_data()
-# --- 新增讀取歷史資料的功能 ---
 @st.cache_data(ttl=600)
 def load_history():
-    # 這裡是您的「總資料庫」發布至網路的 CSV 網址
-    history_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVhobz_uXg7PcjS9BJh0kKh2KosiFnPLAyQq8hiGVPxuQIwCrJVU6pcyYLOukIY2hQIB2e8qXROmBu/pub?gid=1041522227&single=true&output=csv" 
-    try:
-        return pd.read_csv(history_url)
-    except:
-        return pd.DataFrame()
+    # 這裡放總資料庫的 CSV 網址
+    return pd.read_csv("您的總資料庫CSV網址")
 
+def save_to_google_sheet(data):
+    api_url = "https://script.google.com/macros/s/AKfycbwRTMwukxZx8JBD76jWMtrGdpT6lG7gU_8qtzoNXUSSsPPEMN-TaTalZ9tTc33F0KtYvA/exec" # 請填入您的真實網址
+    try:
+        response = requests.post(api_url, json=data)
+        return response.status_code == 200
+    except:
+        return False
+
+# --- 2. 執行頁面邏輯 ---
+all_df = load_data()
 history_df = load_history()
+
 if not all_df.empty:
     selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
-    df_class = all_df[all_df["班級"] == selected_class].copy()
+    # ... 後續您的 UI 程式碼 ...
     
     # 統一格式化顯示名稱的函式
     def get_display_name(row):
