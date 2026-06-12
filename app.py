@@ -7,7 +7,7 @@ import io  # 👈 務必確保上方有 import io
 # --- 修正後的載入函式 ---
 @st.cache_data(ttl=600)
 def load_data():
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkkj/pub?gid=0&single=true&output=csv"
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         response = requests.get(csv_url, headers=headers)
