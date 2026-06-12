@@ -128,7 +128,7 @@ else:
             st.dataframe(class_history, use_container_width=True)
             
             # 4. 統計計算 (請根據你 Google Sheet 的實際名稱修改)
-            # 假設欄位名稱為 "發言/抽籤次數"
+            # 假設欄位名稱為 "發言次數"
             # 正確對應 Sheet 中的欄位名稱
             st.write("### 個人累積統計表")
             stats = class_history.groupby(['座號', '姓名']).agg({
