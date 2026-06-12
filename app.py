@@ -6,25 +6,15 @@ import io  # 👈 務必確保上方有 import io
 
 # --- 修正後的載入函式 ---
 @st.cache_data(ttl=600)
+@st.cache_data(ttl=60) # 暫時縮短快取時間
 def load_data():
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    csv_url = "您的連結貼在這裡"
     try:
-        response = requests.get(csv_url, headers=headers)
-        if response.status_code == 200:
-            # 加入檢查：確保內容不是空的
-            if len(response.text) > 0:
-                df = pd.read_csv(io.StringIO(response.text))
-                # 再次確保 df 有資料
-                if not df.empty:
-                    return df
-            else:
-                st.error("Google Sheet 回傳內容為空，請確認「發布至網路」設定")
-        else:
-            st.error(f"連線失敗，狀態碼：{response.status_code}")
+        df = pd.read_csv(csv_url)
+        return df
     except Exception as e:
-        st.error(f"讀取錯誤：{e}")
-    return pd.DataFrame()
+        st.error(f"讀取資料失敗: {e}")
+        return pd.DataFrame() # 讀取失敗回傳空值
 def load_history():
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -46,9 +36,9 @@ def save_to_google_sheet(data):
 
 # --- 2. 執行頁面邏輯 ---
 all_df = load_data()
-# --- 除錯用 ---
-st.write("讀取到的欄位名稱：", all_df.columns.tolist())
-st.write("讀取到的前幾行資料：", all_df.head())
+all_df = load_data()
+st.write("DEBUG: 讀取到的資料列數 =", len(all_df))
+st.write(all_df.head()) # 看看是不是真的讀到東西了
 # ------------
 history_df = load_history()
 
