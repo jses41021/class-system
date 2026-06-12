@@ -5,16 +5,17 @@ import requests
 import io  # 👈 務必確保上方有 import io
 
 # --- 修正後的載入函式 ---
-@st.cache_data(ttl=600)
-@st.cache_data(ttl=60) # 暫時縮短快取時間
+@st.cache_data(ttl=60)
 def load_data():
-    csv_url = "您的連結貼在這裡"
+    csv_url = "您的CSV網址"
     try:
+        # 改用更原始的讀取方式
         df = pd.read_csv(csv_url)
         return df
     except Exception as e:
-        st.error(f"讀取資料失敗: {e}")
-        return pd.DataFrame() # 讀取失敗回傳空值
+        # 顯示真正的錯誤訊息，不要讓它悄悄消失
+        st.error(f"pd.read_csv 報錯: {e}")
+        return pd.DataFrame()
 def load_history():
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
     headers = {'User-Agent': 'Mozilla/5.0'}
