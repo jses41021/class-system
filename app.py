@@ -5,14 +5,24 @@ import requests
 import io  # 👈 務必確保上方有 import io
 @st.cache_data(ttl=60)
 def load_data():
+    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv" # 請務必確認這裡已替換成正確網址
     try:
-        # 請確認這裡的網址是您「發布至網路」取得的 CSV 網址
-        url = "您的 CSV 網址"
-        df = pd.read_csv(url)
+        df = pd.read_csv(csv_url)
         return df
     except Exception as e:
-        # 如果讀取失敗，回傳一個空的 DataFrame，而不是讓程式死掉
+        st.error(f"讀取 CSV 失敗: {e}")
         return pd.DataFrame()
+
+# 在主程式中強制偵錯
+all_df = load_data()
+st.write("目前讀到的 DataFrame:", all_df) # 這行會把讀取結果直接印在網頁上
+
+# 只有在資料不是空的時候，才執行後續的選單
+if not all_df.empty:
+    selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
+    # ... 後續程式碼 ...
+else:
+    st.warning("⚠️ 資料讀取為空！請檢查 CSV 網址是否正確，且 Google Sheet 是否已「發布至網路」。")
 
 @st.cache_data(ttl=60)
 def load_history():
