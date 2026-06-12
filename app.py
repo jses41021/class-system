@@ -6,46 +6,46 @@ import io  # 👈 務必確保上方有 import io
 
 # --- 修正後的載入函式 ---
 @st.cache_data(ttl=60)
+# --- 1. 定義載入函式 (取代原本混亂的定義) ---
+@st.cache_data(ttl=60)
 def load_data():
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
+    csv_url = "您的名單CSV網址" # 請填入正確網址
     try:
-        # 改用更原始的讀取方式
-        df = pd.read_csv(csv_url)
-        return df
-    except Exception as e:
-        # 顯示真正的錯誤訊息，不要讓它悄悄消失
-        st.error(f"pd.read_csv 報錯: {e}")
+        return pd.read_csv(csv_url)
+    except:
         return pd.DataFrame()
+
+@st.cache_data(ttl=60)
 def load_history():
-    csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    csv_url = "您的總資料庫CSV網址" # 請填入正確網址
     try:
-        response = requests.get(csv_url, headers=headers)
-        if response.status_code == 200:
-            return pd.read_csv(io.StringIO(response.text))
+        return pd.read_csv(csv_url)
     except:
-        pass
-    return pd.DataFrame()
+        return pd.DataFrame()
 
-def save_to_google_sheet(data):
-    api_url = "https://script.google.com/macros/s/AKfycbwRTMwukxZx8JBD76jWMtrGdpT6lG7gU_8qtzoNXUSSsPPEMN-TaTalZ9tTc33F0KtYvA/exec" # 請填入您的真實網址
-    try:
-        response = requests.post(api_url, json=data)
-        return response.status_code == 200
-    except:
-        return False
-
-# --- 2. 執行頁面邏輯 ---
+# --- 2. 執行主邏輯 (取代 Line 41 之後的邏輯) ---
 all_df = load_data()
-all_df = load_data()
-st.write("DEBUG: 讀取到的資料列數 =", len(all_df))
-st.write(all_df.head()) # 看看是不是真的讀到東西了
-# ------------
 history_df = load_history()
 
-if not all_df.empty:
-    selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
-    # ... 後續您的 UI 程式碼 ...
+# 強制除錯檢查
+if all_df.empty:
+    st.error("⚠️ 無法讀取名單！請檢查 Google Sheet 發布連結。")
+else:
+    # 檢查欄位是否存在
+    if "班級" in all_df.columns:
+        selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
+        df_class = all_df[all_df["班級"] == selected_class].copy()
+        
+        # 顯示介面
+        st.subheader(f"目前班級: {selected_class}")
+        tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
+        
+        with tab1:
+            # 這裡放入您原本的點名功能代碼
+            st.write("點名功能啟動中...")
+            
+    else:
+        st.error(f"錯誤：找不到「班級」欄位。目前的欄位有：{all_df.columns.tolist()}")
     
     # 統一格式化顯示名稱的函式
     def get_display_name(row):
