@@ -3,14 +3,13 @@ import pandas as pd
 import datetime
 import requests
 import io  # 👈 務必確保上方有 import io
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=600)
 def load_data():
     csv_url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv" # 請務必確認這裡已替換成正確網址
     try:
         df = pd.read_csv(csv_url)
-        return df
-    except Exception as e:
-        st.error(f"讀取 CSV 失敗: {e}")
+        return pd.read_csv(csv_url) 
+    except:
         return pd.DataFrame()
 
 # 在主程式中強制偵錯
