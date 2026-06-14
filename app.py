@@ -7,6 +7,36 @@ import requests
 st.set_page_config(layout="wide")
 st.title("🍎 班級經營系統")
 
+# 加入 CSS 來修復手機版的欄位換行問題
+st.markdown("""
+    <style>
+    /* 讓按鈕在垂直方向與文字置中對齊 */
+    [data-testid="stHorizontalBlock"] {
+        align-items: center;
+    }
+    
+    /* 針對手機版 (小螢幕) 強制欄位並排，不往下掉 */
+    @media screen and (max-width: 768px) {
+        [data-testid="stHorizontalBlock"] {
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+        }
+        [data-testid="column"] {
+            width: auto !important;
+        }
+        [data-testid="column"]:nth-of-type(1) {
+            flex: 3 !important; /* 第一欄(姓名)佔 3 份空間 */
+        }
+        [data-testid="column"]:nth-of-type(2) {
+            flex: 1 !important; /* 第二欄(按鈕)佔 1 份空間 */
+        }
+        [data-testid="column"]:nth-of-type(3) {
+            display: none !important; /* 隱藏第三欄(空白佔位) */
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- 設定網址 ---
 STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
 HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
@@ -99,8 +129,8 @@ else:
             for name in present_students:
                 row = df_class[df_class['姓名'] == name].iloc[0]
                 
-                # 調整欄位比例：加入空白欄位(_)將前兩個欄位往左邊擠
-                col1, col2, _ = st.columns([3, 1, 6])
+                # 調整欄位比例：[4, 1, 5] 能在電腦版看起來緊湊，且在手機版被 CSS 接管
+                col1, col2, _ = st.columns([4, 1, 5])
                 draws = st.session_state[f'draws_{selected_class}'][name]
                 scores = st.session_state[f'scores_{selected_class}'][name]
                 
