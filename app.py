@@ -98,7 +98,9 @@ else:
 
             for name in present_students:
                 row = df_class[df_class['姓名'] == name].iloc[0]
-                col1, col2 = st.columns([3, 1])
+                
+                # 調整欄位比例：加入空白欄位(_)將前兩個欄位往左邊擠
+                col1, col2, _ = st.columns([3, 1, 6])
                 draws = st.session_state[f'draws_{selected_class}'][name]
                 scores = st.session_state[f'scores_{selected_class}'][name]
                 
