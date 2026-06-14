@@ -7,10 +7,10 @@ import requests
 st.set_page_config(layout="wide")
 st.title("🍎 班級經營系統")
 
-# 加入 CSS 來修復手機版的欄位換行問題
+# 加入 CSS 來修復手機版的欄位換行問題，以及設定儲存按鈕的對齊
 st.markdown("""
     <style>
-    /* 讓按鈕在垂直方向與文字置中對齊 */
+    /* 讓加分按鈕在垂直方向與文字置中對齊 */
     [data-testid="stHorizontalBlock"] {
         align-items: center;
     }
@@ -32,6 +32,16 @@ st.markdown("""
         }
         [data-testid="column"]:nth-of-type(3) {
             display: none !important; /* 隱藏第三欄(空白佔位) */
+        }
+    }
+
+    /* 將分頁標籤列往上拉，與右上方的儲存按鈕並排 */
+    div[data-testid="stTabs"] {
+        margin-top: -55px; 
+    }
+    @media screen and (max-width: 768px) {
+        div[data-testid="stTabs"] {
+            margin-top: 10px; /* 手機版恢復正常間距 */
         }
     }
     </style>
@@ -83,95 +93,94 @@ else:
         # 問題3：紀錄個人對應的分組名稱
         st.session_state[f'group_dict_{selected_class}'] = {name: "無" for name in df_class["姓名"]}
 
-    # 問題5：利用欄位排版將儲存按鈕放在分頁的旁邊
-    col_tabs, col_btn = st.columns([8, 2])
-    
+    # --- 修改部分 ---
+    # 建立上方全域的儲存按鈕 (放在右側 20% 的空間)，不管在哪個分頁都看得到
+    col_space, col_btn = st.columns([8, 2])
     with col_btn:
-        st.write("") # 稍微下壓對齊分頁標籤高度
-        st.write("")
-        save_clicked = st.button("💾 儲存今日紀錄", use_container_width=True)
+        # 加上 type="primary" 讓按鈕帶有主色系(紅色)，視覺上更清晰
+        save_clicked = st.button("💾 儲存今日紀錄", type="primary", use_container_width=True)
 
-    with col_tabs:
-        tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
+    # 由於去除了包裹分頁的 columns，分頁將恢復為滿版寬度
+    tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
 
-        with tab1:
-            st.subheader("點名")
-            for _, row in df_class.iterrows():
-                name = row['姓名']
-                disp = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
-                st.session_state[f'attendance_{selected_class}'][name] = st.checkbox(disp, value=st.session_state[f'attendance_{selected_class}'][name])
+    with tab1:
+        st.subheader("點名")
+        for _, row in df_class.iterrows():
+            name = row['姓名']
+            disp = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
+            st.session_state[f'attendance_{selected_class}'][name] = st.checkbox(disp, value=st.session_state[f'attendance_{selected_class}'][name])
 
-        present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
+    present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
 
-        with tab2:
-            st.subheader("隨機抽籤")
+    with tab2:
+        st.subheader("隨機抽籤")
+        
+        # 問題1：只要中籤+發言>0，下次抽籤名單就把他去除
+        eligible_students = [
+            name for name in present_students 
+            if st.session_state[f'draws_{selected_class}'][name] + st.session_state[f'scores_{selected_class}'][name] == 0
+        ]
+        
+        if st.button("🎲 抽籤 (僅限出席且未中籤/發言者)"):
+            if eligible_students:
+                winner = pd.Series(eligible_students).sample(1).iloc[0]
+                st.session_state[f'last_winner_{selected_class}'] = winner
+                # 問題2：中籤的只加中籤次數，不加發言次數
+                st.session_state[f'draws_{selected_class}'][winner] += 1
+            else:
+                st.warning("目前所有出席者都已經中籤或發言過了！")
+        
+        if st.session_state[f'last_winner_{selected_class}']:
+            winner = st.session_state[f'last_winner_{selected_class}']
+            w_row = df_class[df_class['姓名'] == winner].iloc[0]
+            st.success(f"🎉 抽中：{int(w_row['班級'])}-{int(w_row['座號'])}-{winner}")
+
+        for name in present_students:
+            row = df_class[df_class['姓名'] == name].iloc[0]
             
-            # 問題1：只要中籤+發言>0，下次抽籤名單就把他去除
-            eligible_students = [
-                name for name in present_students 
-                if st.session_state[f'draws_{selected_class}'][name] + st.session_state[f'scores_{selected_class}'][name] == 0
-            ]
+            # 調整欄位比例：[4, 1, 5] 能在電腦版看起來緊湊，且在手機版被 CSS 接管
+            col1, col2, _ = st.columns([4, 1, 5])
+            draws = st.session_state[f'draws_{selected_class}'][name]
+            scores = st.session_state[f'scores_{selected_class}'][name]
             
-            if st.button("🎲 抽籤 (僅限出席且未中籤/發言者)"):
-                if eligible_students:
-                    winner = pd.Series(eligible_students).sample(1).iloc[0]
-                    st.session_state[f'last_winner_{selected_class}'] = winner
-                    # 問題2：中籤的只加中籤次數，不加發言次數
-                    st.session_state[f'draws_{selected_class}'][winner] += 1
-                else:
-                    st.warning("目前所有出席者都已經中籤或發言過了！")
+            # 問題1：名字旁邊都有中籤跟發言的計數
+            col1.write(f"{int(row['班級'])}-{int(row['座號'])}-{name} (中籤: {draws}, 發言: {scores})")
             
-            if st.session_state[f'last_winner_{selected_class}']:
-                winner = st.session_state[f'last_winner_{selected_class}']
-                w_row = df_class[df_class['姓名'] == winner].iloc[0]
-                st.success(f"🎉 抽中：{int(w_row['班級'])}-{int(w_row['座號'])}-{winner}")
+            # 問題2：按加分再顯示發言次數+1
+            if col2.button("加分", key=f"score_{name}"):
+                st.session_state[f'scores_{selected_class}'][name] += 1
+                st.rerun()
 
-            for name in present_students:
-                row = df_class[df_class['姓名'] == name].iloc[0]
+    with tab3:
+        st.subheader("隨機分組")
+        group_n = st.selectbox("組數", [3, 4, 5, 6, 8])
+        if st.button("開始分組"):
+            shuffled = pd.Series(present_students).sample(frac=1).tolist()
+            groups = [shuffled[i::group_n] for i in range(group_n)]
+            
+            # 初始化分組
+            for name in df_class["姓名"]:
+                st.session_state[f'group_dict_{selected_class}'][name] = "無"
                 
-                # 調整欄位比例：[4, 1, 5] 能在電腦版看起來緊湊，且在手機版被 CSS 接管
-                col1, col2, _ = st.columns([4, 1, 5])
-                draws = st.session_state[f'draws_{selected_class}'][name]
-                scores = st.session_state[f'scores_{selected_class}'][name]
+            for i, g in enumerate(groups):
+                group_name = f"第 {i+1} 組"
+                g_str = ", ".join([f"{int(df_class.loc[df_class['姓名']==name, '座號'].values[0])} {name}" for name in g])
+                st.write(f"{group_name}: {g_str}")
                 
-                # 問題1：名字旁邊都有中籤跟發言的計數
-                col1.write(f"{int(row['班級'])}-{int(row['座號'])}-{name} (中籤: {draws}, 發言: {scores})")
-                
-                # 問題2：按加分再顯示發言次數+1
-                if col2.button("加分", key=f"score_{name}"):
-                    st.session_state[f'scores_{selected_class}'][name] += 1
-                    st.rerun()
+                # 問題3：個別寫入學生被分到哪一組
+                for name in g:
+                    st.session_state[f'group_dict_{selected_class}'][name] = group_name
 
-        with tab3:
-            st.subheader("隨機分組")
-            group_n = st.selectbox("組數", [3, 4, 5, 6, 8])
-            if st.button("開始分組"):
-                shuffled = pd.Series(present_students).sample(frac=1).tolist()
-                groups = [shuffled[i::group_n] for i in range(group_n)]
-                
-                # 初始化分組
-                for name in df_class["姓名"]:
-                    st.session_state[f'group_dict_{selected_class}'][name] = "無"
-                    
-                for i, g in enumerate(groups):
-                    group_name = f"第 {i+1} 組"
-                    g_str = ", ".join([f"{int(df_class.loc[df_class['姓名']==name, '座號'].values[0])} {name}" for name in g])
-                    st.write(f"{group_name}: {g_str}")
-                    
-                    # 問題3：個別寫入學生被分到哪一組
-                    for name in g:
-                        st.session_state[f'group_dict_{selected_class}'][name] = group_name
-
-        with tab4:
-            st.subheader("繳費管理")
-            for _, row in df_class.iterrows():
-                name = row['姓名']
-                display_name = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
-                st.session_state[f'payment_{selected_class}'][name] = st.checkbox(
-                    display_name, 
-                    value=st.session_state[f'payment_{selected_class}'][name], 
-                    key=f"pay_{name}"
-                )
+    with tab4:
+        st.subheader("繳費管理")
+        for _, row in df_class.iterrows():
+            name = row['姓名']
+            display_name = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
+            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(
+                display_name, 
+                value=st.session_state[f'payment_{selected_class}'][name], 
+                key=f"pay_{name}"
+            )
     
     # 執行儲存紀錄邏輯 (被移至外部以配合按鈕的新位置)
     if save_clicked:
