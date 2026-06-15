@@ -11,7 +11,7 @@ st.title("🍎 班級經營系統")
 # 如果需要儲存，點選按鈕後會直接觸發下方的邏輯
 save_clicked = st.button("💾 儲存今日紀錄", type="primary")
 
-# 加入 CSS 來修復手機版的欄位換行問題
+# 加入 CSS 來修復手機版的欄位換行問題 (配合加分按鈕左移做比例調整)
 st.markdown("""
     <style>
     [data-testid="stHorizontalBlock"] {
@@ -26,10 +26,11 @@ st.markdown("""
             width: auto !important;
         }
         [data-testid="column"]:nth-of-type(1) {
-            flex: 3 !important;
+            flex: 1 !important;
+            min-width: 65px !important;
         }
         [data-testid="column"]:nth-of-type(2) {
-            flex: 1 !important;
+            flex: 4 !important;
         }
         [data-testid="column"]:nth-of-type(3) {
             display: none !important;
@@ -42,6 +43,8 @@ st.markdown("""
 STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
 HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
+# 新增: 各週次分組紀錄網址
+GROUP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=725381119&single=true&output=csv"
 
 @st.cache_data(ttl=60)
 def load_data(url):
@@ -50,9 +53,12 @@ def load_data(url):
 
 all_df = load_data(STUDENT_URL)
 history_df = load_data(HISTORY_URL)
+group_df = load_data(GROUP_URL)
 
 if not history_df.empty and '班級' in history_df.columns:
     history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
+if not group_df.empty and '班級' in group_df.columns:
+    group_df['班級'] = pd.to_numeric(group_df['班級'], errors='coerce')
 
 if all_df.empty:
     st.warning("⚠️ 學生名單讀取失敗！")
@@ -101,7 +107,8 @@ else:
             except Exception as e:
                 st.error(f"同步請求失敗: {e}")
 
-    tab1, tab2, tab3, tab4 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費"])
+    # 修改: 新增第五個分頁
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費", "📅 各週次分組紀錄"])
 
     with tab1:
         st.subheader("點名")
@@ -109,6 +116,21 @@ else:
             name = row['姓名']
             disp = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
             st.session_state[f'attendance_{selected_class}'][name] = st.checkbox(disp, value=st.session_state[f'attendance_{selected_class}'][name])
+
+        # 修改: 將個人統計表移至 tab1 下方，且只呈現指定欄位
+        st.divider()
+        st.subheader("📊 個人累積統計表")
+        if not history_df.empty:
+            class_hist = history_df[history_df["班級"] == int(selected_class)].copy()
+            if not class_hist.empty:
+                # 重新設定分組依據及顯示的欄位（移除分組）
+                stats = class_hist.groupby(['班級', '座號', '姓名']).agg({
+                    '出席狀態': lambda x: (x == '出席').sum(),
+                    '繳費狀態': lambda x: (x == '已繳').sum(),
+                    '發言次數': 'sum', 
+                    '中籤次數': 'sum'
+                }).reset_index()
+                st.dataframe(stats, use_container_width=True)
 
     present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
 
@@ -129,13 +151,15 @@ else:
             winner = st.session_state[f'last_winner_{selected_class}']
             w_row = df_class[df_class['姓名'] == winner].iloc[0]
             st.success(f"🎉 抽中：{int(w_row['班級'])}-{int(w_row['座號'])}-{winner}")
+        
         for name in present_students:
             row = df_class[df_class['姓名'] == name].iloc[0]
-            col1, col2, _ = st.columns([4, 1, 5])
-            col1.write(f"{int(row['班級'])}-{int(row['座號'])}-{name} (中籤: {st.session_state[f'draws_{selected_class}'][name]}, 發言: {st.session_state[f'scores_{selected_class}'][name]})")
-            if col2.button("加分", key=f"score_{name}"):
+            # 修改: 加分按鈕移至最左側 (col1 和 col2 對調比例與內容)
+            col1, col2 = st.columns([1, 4])
+            if col1.button("加分", key=f"score_{name}"):
                 st.session_state[f'scores_{selected_class}'][name] += 1
                 st.rerun()
+            col2.write(f"{int(row['班級'])}-{int(row['座號'])}-{name} (中籤: {st.session_state[f'draws_{selected_class}'][name]}, 發言: {st.session_state[f'scores_{selected_class}'][name]})")
 
     with tab3:
         st.subheader("隨機分組")
@@ -155,10 +179,27 @@ else:
             name = row['姓名']
             st.session_state[f'payment_{selected_class}'][name] = st.checkbox(f"{int(row['班級'])}-{int(row['座號'])}-{name}", value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
 
-    st.divider()
-    st.subheader("📊 個人累積統計表")
-    if not history_df.empty:
-        class_hist = history_df[history_df["班級"] == int(selected_class)].copy()
-        if not class_hist.empty:
-            stats = class_hist.groupby(['座號', '姓名']).agg({'出席狀態': lambda x: (x == '出席').sum(), '發言次數': 'sum', '中籤次數': 'sum', '分組': 'last'}).reset_index()
-            st.dataframe(stats, use_container_width=True)
+    # 新增: 第五個分頁 (各週次分組紀錄) 顯示邏輯
+    with tab5:
+        st.subheader("各週次分組紀錄")
+        if not group_df.empty and '班級' in group_df.columns:
+            group_class = group_df[group_df["班級"] == int(selected_class)].copy()
+            if not group_class.empty:
+                dates = group_class["日期"].unique()
+                for d in dates:
+                    st.markdown(f"**{d}**")
+                    df_date = group_class[group_class["日期"] == d]
+                    groups = df_date["分組"].dropna().unique()
+                    for g in groups:
+                        df_g = df_date[df_date["分組"] == g]
+                        members = []
+                        for _, r in df_g.iterrows():
+                            seat = int(r["座號"]) if pd.notna(r["座號"]) else ""
+                            name = str(r["姓名"]) if pd.notna(r["姓名"]) else ""
+                            members.append(f"{seat}{name}")
+                        st.write(f"{g}: {''.join(members)}")
+                    st.divider()
+            else:
+                st.write("目前無此班級的分組紀錄。")
+        else:
+            st.warning("⚠️ 分組紀錄讀取失敗或尚未建立資料！")
