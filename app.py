@@ -11,7 +11,7 @@ st.title("🍎 班級經營系統")
 # 如果需要儲存，點選按鈕後會直接觸發下方的邏輯
 save_clicked = st.button("💾 儲存今日紀錄", type="primary")
 
-# 加入 CSS 來修復手機版的欄位換行問題 (配合加分按鈕左移做比例調整)
+# 加入 CSS 來修復手機版的欄位換行問題 (配合加分按鈕左移做比例調整，並拉近距離)
 st.markdown("""
     <style>
     [data-testid="stHorizontalBlock"] {
@@ -21,18 +21,20 @@ st.markdown("""
         [data-testid="stHorizontalBlock"] {
             flex-direction: row !important;
             flex-wrap: nowrap !important;
+            gap: 0.5rem !important; /* 縮小按鈕與文字之間的間距 */
         }
         [data-testid="column"] {
             width: auto !important;
+            padding: 0 !important;
         }
-        [data-testid="column"]:nth-of-type(1) {
-            flex: 1 !important;
-            min-width: 65px !important;
+        [data-testid="column"]:nth-child(1) {
+            width: 75px !important; /* 固定按鈕欄位寬度 */
+            flex: none !important;
         }
-        [data-testid="column"]:nth-of-type(2) {
-            flex: 4 !important;
+        [data-testid="column"]:nth-child(2) {
+            flex: 1 1 auto !important; /* 文字欄位填滿剩餘空間 */
         }
-        [data-testid="column"]:nth-of-type(3) {
+        [data-testid="column"]:nth-child(3) {
             display: none !important;
         }
     }
@@ -59,6 +61,11 @@ if not history_df.empty and '班級' in history_df.columns:
     history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
 if not group_df.empty and '班級' in group_df.columns:
     group_df['班級'] = pd.to_numeric(group_df['班級'], errors='coerce')
+    # 解決 Google 試算表合併儲存格造成的空值問題 (向下填滿)
+    cols_to_ffill = ['日期', '班級', '分組']
+    for col in cols_to_ffill:
+        if col in group_df.columns:
+            group_df[col] = group_df[col].ffill()
 
 if all_df.empty:
     st.warning("⚠️ 學生名單讀取失敗！")
@@ -117,16 +124,16 @@ else:
             disp = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
             st.session_state[f'attendance_{selected_class}'][name] = st.checkbox(disp, value=st.session_state[f'attendance_{selected_class}'][name])
 
-        # 修改: 將個人統計表移至 tab1 下方，且只呈現指定欄位
+        # 修改: 將個人統計表移至 tab1 下方，並修正繳費狀態顯示
         st.divider()
         st.subheader("📊 個人累積統計表")
         if not history_df.empty:
             class_hist = history_df[history_df["班級"] == int(selected_class)].copy()
             if not class_hist.empty:
-                # 重新設定分組依據及顯示的欄位（移除分組）
+                # 重新設定分組依據及顯示的欄位（移除分組，修正繳費狀態邏輯）
                 stats = class_hist.groupby(['班級', '座號', '姓名']).agg({
                     '出席狀態': lambda x: (x == '出席').sum(),
-                    '繳費狀態': lambda x: (x == '已繳').sum(),
+                    '繳費狀態': lambda x: "已繳" if (x == '已繳').any() else "未繳",
                     '發言次數': 'sum', 
                     '中籤次數': 'sum'
                 }).reset_index()
@@ -154,12 +161,14 @@ else:
         
         for name in present_students:
             row = df_class[df_class['姓名'] == name].iloc[0]
-            # 修改: 加分按鈕移至最左側 (col1 和 col2 對調比例與內容)
-            col1, col2 = st.columns([1, 4])
-            if col1.button("加分", key=f"score_{name}"):
-                st.session_state[f'scores_{selected_class}'][name] += 1
-                st.rerun()
-            col2.write(f"{int(row['班級'])}-{int(row['座號'])}-{name} (中籤: {st.session_state[f'draws_{selected_class}'][name]}, 發言: {st.session_state[f'scores_{selected_class}'][name]})")
+            # 調整比例，讓電腦版與手機版都能使按鈕和名字靠近
+            col1, col2 = st.columns([1, 6])
+            with col1:
+                if st.button("加分", key=f"score_{name}"):
+                    st.session_state[f'scores_{selected_class}'][name] += 1
+                    st.rerun()
+            with col2:
+                st.write(f"{int(row['班級'])}-{int(row['座號'])}-{name} (中籤: {st.session_state[f'draws_{selected_class}'][name]}, 發言: {st.session_state[f'scores_{selected_class}'][name]})")
 
     with tab3:
         st.subheader("隨機分組")
@@ -185,7 +194,7 @@ else:
         if not group_df.empty and '班級' in group_df.columns:
             group_class = group_df[group_df["班級"] == int(selected_class)].copy()
             if not group_class.empty:
-                dates = group_class["日期"].unique()
+                dates = group_class["日期"].dropna().unique()
                 for d in dates:
                     st.markdown(f"**{d}**")
                     df_date = group_class[group_class["日期"] == d]
