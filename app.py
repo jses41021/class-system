@@ -11,7 +11,7 @@ st.title("🍎 班級經營系統")
 # 如果需要儲存，點選按鈕後會直接觸發下方的邏輯
 save_clicked = st.button("💾 儲存今日紀錄", type="primary")
 
-# 加入 CSS 來修復手機版的欄位換行問題 (配合加分按鈕左移做比例調整，並拉近距離)
+# 加入 CSS 來修復手機版的欄位換行問題 (配合加分按鈕左移做比例調整，並極致拉近距離)
 st.markdown("""
     <style>
     [data-testid="stHorizontalBlock"] {
@@ -21,21 +21,41 @@ st.markdown("""
         [data-testid="stHorizontalBlock"] {
             flex-direction: row !important;
             flex-wrap: nowrap !important;
-            gap: 0.5rem !important; /* 縮小按鈕與文字之間的間距 */
+            gap: 4px !important; /* 極致縮減按鈕與文字之間的間距 */
         }
         [data-testid="column"] {
             width: auto !important;
             padding: 0 !important;
         }
         [data-testid="column"]:nth-child(1) {
-            width: 75px !important; /* 固定按鈕欄位寬度 */
+            width: 55px !important; /* 固定按鈕欄位寬度，讓按鈕與文字緊密相連 */
             flex: none !important;
+            margin-right: 0px !important;
         }
         [data-testid="column"]:nth-child(2) {
             flex: 1 1 auto !important; /* 文字欄位填滿剩餘空間 */
+            margin-left: 0px !important;
+            padding-left: 0px !important;
         }
         [data-testid="column"]:nth-child(3) {
             display: none !important;
+        }
+        /* 調整手機版按鈕內距，使其小巧、省空間 */
+        div.stButton > button {
+            padding: 2px 6px !important;
+            font-size: 14px !important;
+            min-height: unset !important;
+            height: 32px !important;
+            width: 100% !important;
+            margin: 0 !important;
+        }
+        /* 調整文字的行高與大小，與按鈕完美對齊並防止跑版 */
+        div.stMarkdown p {
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 13px !important;
+            line-height: 32px !important; /* 與按鈕高度齊平 */
+            white-space: nowrap !important;
         }
     }
     </style>
@@ -161,8 +181,8 @@ else:
         
         for name in present_students:
             row = df_class[df_class['姓名'] == name].iloc[0]
-            # 調整比例，讓電腦版與手機版都能使按鈕和名字靠近
-            col1, col2 = st.columns([1, 6])
+            # 調整比例為 [1, 10]，配合 CSS 的強制縮進，可完美貼合
+            col1, col2 = st.columns([1, 10])
             with col1:
                 if st.button("加分", key=f"score_{name}"):
                     st.session_state[f'scores_{selected_class}'][name] += 1
