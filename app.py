@@ -2,59 +2,46 @@ import streamlit as st
 import pandas as pd
 import datetime
 import requests
+import re
 
 # --- 設定頁面 ---
 st.set_page_config(layout="wide")
 st.title("🍎 班級經營系統")
 
-# 修正儲存按鈕位置：直接放在標題下方
-# 如果需要儲存，點選按鈕後會直接觸發下方的邏輯
 save_clicked = st.button("💾 儲存今日紀錄", type="primary")
 
-# 加入 CSS 來修復手機版的欄位換行問題 (配合加分按鈕左移做比例調整，並極致拉近距離)
+# 優化手機版 CSS：強制按鈕與文字同行，並極大化縮小間距
 st.markdown("""
     <style>
-    [data-testid="stHorizontalBlock"] {
-        align-items: center;
-    }
     @media screen and (max-width: 768px) {
-        [data-testid="stHorizontalBlock"] {
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            gap: 4px !important; /* 極致縮減按鈕與文字之間的間距 */
+        /* 取消 Streamlit 預設的直向排列，強制橫向 */
+        div[data-testid="column"] {
+            min-width: 0 !important;
+            padding-left: 2px !important;
+            padding-right: 2px !important;
         }
-        [data-testid="column"] {
-            width: auto !important;
-            padding: 0 !important;
+        /* 第一個欄位 (按鈕) 固定寬度縮至極限 */
+        div[data-testid="column"]:nth-of-type(1) {
+            flex: 0 0 55px !important; 
+            width: 55px !important;
         }
-        [data-testid="column"]:nth-child(1) {
-            width: 55px !important; /* 固定按鈕欄位寬度，讓按鈕與文字緊密相連 */
-            flex: none !important;
-            margin-right: 0px !important;
+        /* 第二個欄位 (文字) 填滿剩餘空間 */
+        div[data-testid="column"]:nth-of-type(2) {
+            flex: 1 1 auto !important;
         }
-        [data-testid="column"]:nth-child(2) {
-            flex: 1 1 auto !important; /* 文字欄位填滿剩餘空間 */
-            margin-left: 0px !important;
-            padding-left: 0px !important;
-        }
-        [data-testid="column"]:nth-child(3) {
-            display: none !important;
-        }
-        /* 調整手機版按鈕內距，使其小巧、省空間 */
+        /* 縮小按鈕本體 */
         div.stButton > button {
-            padding: 2px 6px !important;
-            font-size: 14px !important;
-            min-height: unset !important;
-            height: 32px !important;
-            width: 100% !important;
-            margin: 0 !important;
-        }
-        /* 調整文字的行高與大小，與按鈕完美對齊並防止跑版 */
-        div.stMarkdown p {
-            margin: 0 !important;
-            padding: 0 !important;
+            padding: 2px 4px !important;
             font-size: 13px !important;
-            line-height: 32px !important; /* 與按鈕高度齊平 */
+            height: 32px !important;
+            min-height: 32px !important;
+            width: 100% !important;
+        }
+        /* 文字對齊按鈕高度，避免跑版 */
+        div.stMarkdown p {
+            line-height: 32px !important;
+            margin: 0 !important;
+            font-size: 13px !important;
             white-space: nowrap !important;
         }
     }
@@ -65,7 +52,6 @@ st.markdown("""
 STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
 HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
-# 新增: 各週次分組紀錄網址
 GROUP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=725381119&single=true&output=csv"
 
 @st.cache_data(ttl=60)
@@ -81,7 +67,6 @@ if not history_df.empty and '班級' in history_df.columns:
     history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
 if not group_df.empty and '班級' in group_df.columns:
     group_df['班級'] = pd.to_numeric(group_df['班級'], errors='coerce')
-    # 解決 Google 試算表合併儲存格造成的空值問題 (向下填滿)
     cols_to_ffill = ['日期', '班級', '分組']
     for col in cols_to_ffill:
         if col in group_df.columns:
@@ -108,7 +93,7 @@ else:
         st.session_state[f'last_winner_{selected_class}'] = None
         st.session_state[f'group_dict_{selected_class}'] = {name: "無" for name in df_class["姓名"]}
 
-    # --- 執行儲存紀錄邏輯 (移至全域，確保能正確觸發) ---
+    # --- 執行儲存每日紀錄邏輯 ---
     if save_clicked:
         with st.spinner("正在批次同步..."):
             all_data = []
@@ -134,8 +119,8 @@ else:
             except Exception as e:
                 st.error(f"同步請求失敗: {e}")
 
-    # 修改: 新增第五個分頁
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費", "📅 各週次分組紀錄"])
+    # 修改: 刪除原有的 tab5，替換為作業繳交
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費", "📝 作業繳交"])
 
     with tab1:
         st.subheader("點名")
@@ -144,13 +129,11 @@ else:
             disp = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
             st.session_state[f'attendance_{selected_class}'][name] = st.checkbox(disp, value=st.session_state[f'attendance_{selected_class}'][name])
 
-        # 修改: 將個人統計表移至 tab1 下方，並修正繳費狀態顯示
         st.divider()
         st.subheader("📊 個人累積統計表")
         if not history_df.empty:
             class_hist = history_df[history_df["班級"] == int(selected_class)].copy()
             if not class_hist.empty:
-                # 重新設定分組依據及顯示的欄位（移除分組，修正繳費狀態邏輯）
                 stats = class_hist.groupby(['班級', '座號', '姓名']).agg({
                     '出席狀態': lambda x: (x == '出席').sum(),
                     '繳費狀態': lambda x: "已繳" if (x == '已繳').any() else "未繳",
@@ -181,8 +164,8 @@ else:
         
         for name in present_students:
             row = df_class[df_class['姓名'] == name].iloc[0]
-            # 調整比例為 [1, 10]，配合 CSS 的強制縮進，可完美貼合
-            col1, col2 = st.columns([1, 10])
+            # 使用 gap="small" 配合上方 CSS，讓手機版能完美貼合
+            col1, col2 = st.columns([1.5, 8.5], gap="small")
             with col1:
                 if st.button("加分", key=f"score_{name}"):
                     st.session_state[f'scores_{selected_class}'][name] += 1
@@ -201,20 +184,15 @@ else:
                 group_name = f"第 {i+1} 組"
                 st.write(f"{group_name}: {', '.join([f'{int(df_class.loc[df_class['姓名']==name, '座號'].values[0])} {name}' for name in g])}")
                 for name in g: st.session_state[f'group_dict_{selected_class}'][name] = group_name
-
-    with tab4:
-        st.subheader("繳費管理")
-        for _, row in df_class.iterrows():
-            name = row['姓名']
-            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(f"{int(row['班級'])}-{int(row['座號'])}-{name}", value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
-
-    # 新增: 第五個分頁 (各週次分組紀錄) 顯示邏輯
-    with tab5:
-        st.subheader("各週次分組紀錄")
+        
+        # 新增: 將各週次分組紀錄整合至此，並倒序排列
+        st.divider()
+        st.subheader("📅 各週次分組紀錄 (最新至最舊)")
         if not group_df.empty and '班級' in group_df.columns:
             group_class = group_df[group_df["班級"] == int(selected_class)].copy()
             if not group_class.empty:
-                dates = group_class["日期"].dropna().unique()
+                # 取得日期並反向排序 (越新的日期在越上方)
+                dates = sorted(group_class["日期"].dropna().unique(), reverse=True)
                 for d in dates:
                     st.markdown(f"**{d}**")
                     df_date = group_class[group_class["日期"] == d]
@@ -232,3 +210,96 @@ else:
                 st.write("目前無此班級的分組紀錄。")
         else:
             st.warning("⚠️ 分組紀錄讀取失敗或尚未建立資料！")
+
+    with tab4:
+        st.subheader("繳費管理")
+        for _, row in df_class.iterrows():
+            name = row['姓名']
+            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(f"{int(row['班級'])}-{int(row['座號'])}-{name}", value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
+
+    # 新增: 作業繳交分頁邏輯
+    with tab5:
+        st.subheader("📝 作業繳交管理")
+        st.markdown("請在下方貼上缺交名單：")
+        
+        # 預設提示文字
+        placeholder_text = "作業名稱：健康餐盤\n日期：2026/6/13\n班級：301\n缺交同學座號：2、5、10"
+        hw_input = st.text_area("貼上缺交名單", height=150, placeholder=placeholder_text)
+        
+        if st.button("📥 一鍵匯入名單"):
+            try:
+                # 解析輸入文字
+                hw_name = re.search(r'作業名稱：(.*)', hw_input).group(1).strip()
+                hw_date = re.search(r'日期：(.*)', hw_input).group(1).strip()
+                hw_class = re.search(r'班級：(.*)', hw_input).group(1).strip()
+                
+                if int(hw_class) != int(selected_class):
+                    st.error(f"⚠️ 貼上的班級 ({hw_class}) 與目前選擇的班級 ({selected_class}) 不符！")
+                else:
+                    missing_str_match = re.search(r'缺交同學座號：(.*)', hw_input)
+                    missing_seats = []
+                    if missing_str_match:
+                        missing_str = missing_str_match.group(1).strip()
+                        # 支援頓號、逗號、空白等多種分隔符號
+                        parts = re.split(r'[、,，\s]+', missing_str)
+                        missing_seats = [int(p) for p in parts if p.isdigit()]
+                    
+                    # 建立 DataFrame 狀態
+                    hw_data = []
+                    for _, row in df_class.iterrows():
+                        seat = int(row['座號'])
+                        name = row['姓名']
+                        status = "未繳" if seat in missing_seats else ""
+                        hw_data.append({"座號": seat, "姓名": name, "繳交狀態": status})
+                    
+                    st.session_state[f'hw_df_{selected_class}'] = pd.DataFrame(hw_data)
+                    st.session_state[f'hw_name_{selected_class}'] = hw_name
+                    st.session_state[f'hw_date_{selected_class}'] = hw_date
+                    st.success("✅ 名單匯入成功！請在下方表格確認或修改。")
+            except Exception as e:
+                st.error("❌ 格式解析錯誤，請確認貼上的文字格式是否與範例完全一致（包含冒號）。")
+
+        # 若已解析過，顯示可編輯的表格
+        if f'hw_df_{selected_class}' in st.session_state:
+            st.markdown(f"#### 📚 目前作業：{st.session_state[f'hw_name_{selected_class}']} ({st.session_state[f'hw_date_{selected_class}']})")
+            
+            # 使用 st.data_editor 讓使用者可以直接在網頁上修改「繳交狀態」
+            edited_hw_df = st.data_editor(
+                st.session_state[f'hw_df_{selected_class}'],
+                column_config={
+                    "座號": st.column_config.NumberColumn("座號", disabled=True),
+                    "姓名": st.column_config.TextColumn("姓名", disabled=True),
+                    "繳交狀態": st.column_config.SelectboxColumn(
+                        "繳交狀態",
+                        help="點擊修改：空白表示已繳交，顯示'未繳'表示缺交",
+                        options=["", "未繳"],
+                        required=False
+                    )
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # 更新 session state 以保留使用者手動編輯的結果
+            st.session_state[f'hw_df_{selected_class}'] = edited_hw_df
+            
+            if st.button("📤 儲存作業紀錄至 Google Sheet", type="secondary"):
+                with st.spinner("正在上傳作業紀錄..."):
+                    hw_payload = []
+                    for _, row in edited_hw_df.iterrows():
+                        hw_payload.append({
+                            "日期": st.session_state[f'hw_date_{selected_class}'],
+                            "班級": int(selected_class),
+                            "座號": int(row['座號']),
+                            "姓名": row['姓名'],
+                            "作業名稱": st.session_state[f'hw_name_{selected_class}'],
+                            "繳交狀態": row['繳交狀態']
+                        })
+                    try:
+                        response = requests.post(WEB_APP_URL, json=hw_payload, timeout=15)
+                        if response.status_code == 200:
+                            st.success("✅ 作業紀錄已成功儲存至「作業繳交」分頁！")
+                        else:
+                            st.error(f"儲存發生錯誤，狀態碼: {response.status_code}")
+                    except Exception as e:
+                        st.error(f"連線失敗: {e}")
