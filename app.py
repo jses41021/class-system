@@ -34,15 +34,12 @@ def load_data(url):
     try: return pd.read_csv(url)
     except: return pd.DataFrame()
 
-# 載入資料
 all_df = load_data(STUDENT_URL)
 history_df = load_data(HISTORY_URL)
 group_df = load_data(GROUP_URL)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費", "📝 作業繳交"])
-
 if all_df.empty:
-    st.sidebar.warning("⚠️ 學生名單讀取失敗，請檢查網路或 Google Sheet 連結。")
+    st.warning("⚠️ 學生名單讀取失敗！")
 else:
     selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
     df_class = all_df[all_df["班級"] == selected_class].copy()
@@ -50,22 +47,7 @@ else:
     if 'hw_all_df' not in st.session_state:
         st.session_state['hw_all_df'] = load_data(HW_URL)
 
-    with tab1:
-        st.subheader("點名")
-        for _, row in df_class.iterrows():
-            st.checkbox(f"{int(row['班級'])}-{int(row['座號'])}-{row['姓名']}")
-
-    with tab2:
-        st.subheader("🎲 抽籤與發言")
-        st.info("此處為抽籤功能區。")
-
-    with tab3:
-        st.subheader("👥 分組管理")
-        st.info("此處為分組紀錄顯示區。")
-
-    with tab4:
-        st.subheader("💰 繳費管理")
-        st.info("此處為繳費狀態確認區。")
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費", "📝 作業繳交"])
 
     with tab5:
         st.subheader("📝 作業繳交管理")
