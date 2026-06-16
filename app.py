@@ -10,7 +10,7 @@ st.title("🍎 班級經營系統")
 
 save_clicked = st.button("💾 儲存今日紀錄", type="primary")
 
-# 優化手機版 CSS
+# 優化手機版 CSS (強制抽籤發言在同一行，不換行)
 st.markdown("""
     <style>
     @media screen and (max-width: 768px) {
@@ -142,6 +142,8 @@ else:
                     '發言次數': 'sum', 
                     '中籤次數': 'sum'
                 }).reset_index()
+                # ✅ 將班級、座號、姓名設為 Index，達成凍結窗格效果
+                stats.set_index(['班級', '座號', '姓名'], inplace=True)
                 st.dataframe(stats, use_container_width=True)
 
     present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
@@ -215,23 +217,48 @@ else:
         df_hw_all = st.session_state['hw_all_df']
         class_hw_df = df_hw_all[df_hw_all['班級'] == int(selected_class)].copy()
         
-        # 修正：不使用 MultiIndex，直接顯示原本的欄位，避免 st.data_editor 報錯
-        st.markdown("👇 **學生作業狀況總表 (點擊儲存按鈕上傳修改)**")
-        edited_class_hw_df = st.data_editor(class_hw_df, use_container_width=True)
+        # ✅ 將班級、座號、姓名設為 Index，達成凍結窗格效果
+        class_hw_df.set_index(['班級', '座號', '姓名'], inplace=True)
+        
+        # ✅ 使用 column_config 讓所有的作業欄位變成「下拉式選單」
+        hw_col_config = {}
+        for col in class_hw_df.columns:
+            if col not in ['班級', '座號', '姓名', '日期']: # 排除基本資訊欄位
+                hw_col_config[col] = st.column_config.SelectboxColumn(col, options=["已繳", "未繳", ""])
+        
+        st.markdown("👇 **學生作業狀況總表 (可往右滑動查看，點兩下儲存格可下拉修改狀態)**")
+        # 顯示可修改且具備凍結窗格的表格
+        edited_class_hw_df = st.data_editor(class_hw_df, use_container_width=True, column_config=hw_col_config)
 
         if st.button("📤 儲存表格修改至 Google Sheet", type="secondary"):
-            with st.spinner("正在上傳作業紀錄..."):
-                # 更新狀態
-                for idx, row in edited_class_hw_df.iterrows():
+            with st.spinner("正在合併最新資料並上傳紀錄..."):
+                # ✅ 儲存前，強制清除快取重新去要一次最新版本的 Google Sheet！
+                load_data.clear()
+                latest_df = load_data(HW_URL)
+                if not latest_df.empty and '班級' in latest_df.columns:
+                    df_hw_all = latest_df
+                else:
+                    df_hw_all = st.session_state['hw_all_df']
+                
+                # 將修改的結果合併回最新版本的全校大表
+                edited_reset = edited_class_hw_df.reset_index()
+                
+                # 確保新作業的欄位有在總表中
+                for col in edited_reset.columns:
+                    if col not in df_hw_all.columns:
+                        df_hw_all[col] = ""
+
+                for idx, row in edited_reset.iterrows():
                     mask = (df_hw_all['班級'] == row['班級']) & (df_hw_all['座號'] == row['座號'])
                     for col in edited_class_hw_df.columns:
                         df_hw_all.loc[mask, col] = row[col]
+                        
                 st.session_state['hw_all_df'] = df_hw_all
                 
                 hw_payload = {"action": "overwrite_homework", "data": df_hw_all.fillna("").to_dict(orient="records")}
                 try:
                     res = requests.post(WEB_APP_URL, json=hw_payload, timeout=15)
-                    if res.status_code == 200: st.success("✅ 作業紀錄已成功更新！")
+                    if res.status_code == 200: st.success("✅ 作業紀錄已成功更新！不會覆蓋掉其他人的心血囉！")
                     else: st.error(f"儲存發生錯誤，狀態碼: {res.status_code}")
                 except Exception as e: st.error(f"連線失敗: {e}")
 
@@ -254,7 +281,17 @@ else:
                 else:
                     parts = re.split(r'[、,，\s]+', missing_str)
                     missing_seats = [int(p) for p in parts if p.isdigit()]
+                    
+                    # ✅ 匯入前，同樣強制清除快取重新去要最新版本的 Google Sheet，避免覆蓋舊資料
+                    load_data.clear()
+                    latest_df = load_data(HW_URL)
+                    if not latest_df.empty and '班級' in latest_df.columns:
+                        df_hw_all = latest_df
+                    else:
+                        df_hw_all = st.session_state['hw_all_df']
+
                     if hw_name not in df_hw_all.columns: df_hw_all[hw_name] = ""
+                    
                     mask_class = df_hw_all['班級'] == int(selected_class)
                     for idx, row in df_hw_all[mask_class].iterrows():
                         status = "未繳" if int(row['座號']) in missing_seats else "已繳"
@@ -265,7 +302,7 @@ else:
                         hw_payload = {"action": "overwrite_homework", "data": df_hw_all.fillna("").to_dict(orient="records")}
                         res = requests.post(WEB_APP_URL, json=hw_payload, timeout=15)
                         if res.status_code == 200:
-                            st.success(f"✅ {hw_name} 缺交名單匯入成功！")
+                            st.success(f"✅ {hw_name} 缺交名單匯入成功！歷史紀錄也安全保留了！")
                             st.rerun()
                         else: st.error("⚠️ 同步失敗。")
             except Exception as e: st.error(f"❌ 解析錯誤：{e}")
