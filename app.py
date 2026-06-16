@@ -34,12 +34,16 @@ def load_data(url):
     try: return pd.read_csv(url)
     except: return pd.DataFrame()
 
+# 載入資料
 all_df = load_data(STUDENT_URL)
 history_df = load_data(HISTORY_URL)
 group_df = load_data(GROUP_URL)
 
+# 確保 Tabs 結構即使在資料未載入時也能顯示
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費", "📝 作業繳交"])
+
 if all_df.empty:
-    st.warning("⚠️ 學生名單讀取失敗！")
+    st.sidebar.warning("⚠️ 學生名單讀取失敗，請檢查網路或 Google Sheet 連結。")
 else:
     selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
     df_class = all_df[all_df["班級"] == selected_class].copy()
@@ -47,7 +51,11 @@ else:
     if 'hw_all_df' not in st.session_state:
         st.session_state['hw_all_df'] = load_data(HW_URL)
 
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["✅ 點名", "🎲 抽籤/發言", "👥 分組", "💰 繳費", "📝 作業繳交"])
+    with tab1:
+        st.subheader("點名")
+        for _, row in df_class.iterrows():
+            name = row['姓名']
+            st.checkbox(f"{int(row['班級'])}-{int(row['座號'])}-{name}")
 
     with tab5:
         st.subheader("📝 作業繳交管理")
