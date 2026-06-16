@@ -142,9 +142,14 @@ else:
                     '發言次數': 'sum', 
                     '中籤次數': 'sum'
                 }).reset_index()
-                # ✅ 將班級、座號、姓名設為 Index，達成凍結窗格效果
-                stats.set_index(['班級', '座號', '姓名'], inplace=True)
-                st.dataframe(stats, use_container_width=True)
+                
+                # ✅ 將座號、姓名合併為單一 Index 達成凍結窗格，解決手機版佔用太多空間的問題
+                stats['座號 - 姓名'] = stats['座號'].fillna(0).astype(int).astype(str) + " - " + stats['姓名']
+                stats.set_index('座號 - 姓名', inplace=True)
+                
+                # 隱藏不需要重複顯示的欄位，畫面更清爽
+                display_stats = stats.drop(columns=['班級', '座號', '姓名'])
+                st.dataframe(display_stats, use_container_width=True)
 
     present_students = [name for name, present in st.session_state[f'attendance_{selected_class}'].items() if present]
 
@@ -217,22 +222,26 @@ else:
         df_hw_all = st.session_state['hw_all_df']
         class_hw_df = df_hw_all[df_hw_all['班級'] == int(selected_class)].copy()
         
-        # ✅ 將班級、座號、姓名設為 Index，達成凍結窗格效果
-        class_hw_df.set_index(['班級', '座號', '姓名'], inplace=True)
+        # ✅ 合併座號與姓名為單一 Index 達成凍結窗格，解決 Streamlit 不支援 MultiIndex 編輯報錯的問題
+        class_hw_df['座號 - 姓名'] = class_hw_df['座號'].fillna(0).astype(int).astype(str) + " - " + class_hw_df['姓名']
+        class_hw_df.set_index('座號 - 姓名', inplace=True)
+        
+        # 將基本資料隱藏，只留下作業，讓手機版版面更乾淨
+        cols_to_hide = ['班級', '座號', '姓名', '日期']
+        display_hw_df = class_hw_df.drop(columns=[c for c in cols_to_hide if c in class_hw_df.columns])
         
         # ✅ 使用 column_config 讓所有的作業欄位變成「下拉式選單」
         hw_col_config = {}
-        for col in class_hw_df.columns:
-            if col not in ['班級', '座號', '姓名', '日期']: # 排除基本資訊欄位
-                hw_col_config[col] = st.column_config.SelectboxColumn(col, options=["已繳", "未繳", ""])
+        for col in display_hw_df.columns:
+            hw_col_config[col] = st.column_config.SelectboxColumn(col, options=["已繳", "未繳", ""])
         
         st.markdown("👇 **學生作業狀況總表 (可往右滑動查看，點兩下儲存格可下拉修改狀態)**")
-        # 顯示可修改且具備凍結窗格的表格
-        edited_class_hw_df = st.data_editor(class_hw_df, use_container_width=True, column_config=hw_col_config)
+        # 顯示可修改且具備單一凍結窗格的表格
+        edited_display_df = st.data_editor(display_hw_df, use_container_width=True, column_config=hw_col_config)
 
         if st.button("📤 儲存表格修改至 Google Sheet", type="secondary"):
             with st.spinner("正在合併最新資料並上傳紀錄..."):
-                # ✅ 儲存前，強制清除快取重新去要一次最新版本的 Google Sheet！
+                # 儲存前，強制清除快取重新去要一次最新版本的 Google Sheet！
                 load_data.clear()
                 latest_df = load_data(HW_URL)
                 if not latest_df.empty and '班級' in latest_df.columns:
@@ -241,16 +250,18 @@ else:
                     df_hw_all = st.session_state['hw_all_df']
                 
                 # 將修改的結果合併回最新版本的全校大表
-                edited_reset = edited_class_hw_df.reset_index()
+                edited_reset = edited_display_df.reset_index()
                 
                 # 確保新作業的欄位有在總表中
-                for col in edited_reset.columns:
+                for col in edited_display_df.columns:
                     if col not in df_hw_all.columns:
                         df_hw_all[col] = ""
 
                 for idx, row in edited_reset.iterrows():
-                    mask = (df_hw_all['班級'] == row['班級']) & (df_hw_all['座號'] == row['座號'])
-                    for col in edited_class_hw_df.columns:
+                    # 從「座號 - 姓名」中提取座號
+                    seat_val = int(str(row['座號 - 姓名']).split(" - ")[0])
+                    mask = (df_hw_all['班級'] == int(selected_class)) & (df_hw_all['座號'].fillna(0).astype(int) == seat_val)
+                    for col in edited_display_df.columns:
                         df_hw_all.loc[mask, col] = row[col]
                         
                 st.session_state['hw_all_df'] = df_hw_all
@@ -282,7 +293,7 @@ else:
                     parts = re.split(r'[、,，\s]+', missing_str)
                     missing_seats = [int(p) for p in parts if p.isdigit()]
                     
-                    # ✅ 匯入前，同樣強制清除快取重新去要最新版本的 Google Sheet，避免覆蓋舊資料
+                    # 匯入前，同樣強制清除快取重新去要最新版本的 Google Sheet，避免覆蓋舊資料
                     load_data.clear()
                     latest_df = load_data(HW_URL)
                     if not latest_df.empty and '班級' in latest_df.columns:
