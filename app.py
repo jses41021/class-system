@@ -241,13 +241,8 @@ else:
 
         if st.button("📤 儲存表格修改至 Google Sheet", type="secondary"):
             with st.spinner("正在合併最新資料並上傳紀錄..."):
-                # 儲存前，強制清除快取重新去要一次最新版本的 Google Sheet！
-                load_data.clear()
-                latest_df = load_data(HW_URL)
-                if not latest_df.empty and '班級' in latest_df.columns:
-                    df_hw_all = latest_df
-                else:
-                    df_hw_all = st.session_state['hw_all_df']
+                # ✅ 修正 1: 使用 session_state 中累積的資料，避免去抓到 Google 尚未更新的舊快取 CSV 而導致洗掉資料
+                df_hw_all = st.session_state['hw_all_df']
                 
                 # 將修改的結果合併回最新版本的全校大表
                 edited_reset = edited_display_df.reset_index()
@@ -279,27 +274,23 @@ else:
         
         if st.button("一鍵匯入名單並同步至 Sheet", type="primary"):
             try:
-                hw_name_match = re.search(r'作業名稱[：:](.*?)(?=日期[：:]|$)', hw_input, re.DOTALL)
-                hw_class_match = re.search(r'班級[：:](.*?)(?=缺交同學座號[：:]|$)', hw_input, re.DOTALL)
+                # ✅ 修正 2: 強化正則表達式，只要碰到「日期」、「班級」或「缺交」任何一個關鍵字就立刻停止抓取，避免內容混在一起
+                hw_name_match = re.search(r'作業名稱[：:](.*?)(?=(?:日期|班級|缺交同學座號)[：:]|$)', hw_input, re.DOTALL)
+                hw_class_match = re.search(r'班級[：:](.*?)(?=(?:作業名稱|日期|缺交同學座號)[：:]|$)', hw_input, re.DOTALL)
                 hw_missing_match = re.search(r'缺交同學座號[：:](.*)', hw_input, re.DOTALL)
 
                 hw_name = hw_name_match.group(1).strip() if hw_name_match else ""
                 hw_class = hw_class_match.group(1).strip() if hw_class_match else ""
                 missing_str = hw_missing_match.group(1).strip() if hw_missing_match else ""
                 
-                if not hw_name or not hw_class: st.error("❌ 格式解析錯誤。")
+                if not hw_name or not hw_class: st.error("❌ 格式解析錯誤。請確認有『作業名稱：』與『班級：』等關鍵字。")
                 elif int(hw_class) != int(selected_class): st.error(f"⚠️ 貼上的班級 ({hw_class}) 與目前選擇的班級 ({selected_class}) 不符！")
                 else:
                     parts = re.split(r'[、,，\s]+', missing_str)
                     missing_seats = [int(p) for p in parts if p.isdigit()]
                     
-                    # 匯入前，同樣強制清除快取重新去要最新版本的 Google Sheet，避免覆蓋舊資料
-                    load_data.clear()
-                    latest_df = load_data(HW_URL)
-                    if not latest_df.empty and '班級' in latest_df.columns:
-                        df_hw_all = latest_df
-                    else:
-                        df_hw_all = st.session_state['hw_all_df']
+                    # ✅ 修正 1: 匯入時也直接使用 session_state 中累積的資料
+                    df_hw_all = st.session_state['hw_all_df']
 
                     if hw_name not in df_hw_all.columns: df_hw_all[hw_name] = ""
                     
