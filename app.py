@@ -57,7 +57,7 @@ HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleM
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
 GROUP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=725381119&single=true&output=csv"
 # ⚠️ 請替換下方的網址為「作業繳交」分頁發布到網路的 CSV 網址 ⚠️
-HW_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=842254015&single=true&output=csv" 
+HW_URL = "請在此填入『作業繳交』分頁發布到網路的_CSV_網址" 
 
 @st.cache_data(ttl=60)
 def load_data(url):
@@ -242,7 +242,8 @@ else:
         
         # 讓使用者可以在網頁上手動編輯任何一項作業狀態
         st.markdown("👇 **學生作業狀況總表 (可往右滑動，班級/座號/姓名會凍結。可直接點擊表格修改)**")
-        edited_class_hw_df = st.data_editor(class_hw_df, use_container_width=True, num_rows="dynamic")
+        # 修正：移除 num_rows="dynamic"，因為 st.data_editor 不支援對 MultiIndex (凍結窗格) 動態新增列
+        edited_class_hw_df = st.data_editor(class_hw_df, use_container_width=True)
 
         if st.button("📤 儲存表格修改至 Google Sheet", type="secondary"):
             with st.spinner("正在上傳作業紀錄..."):
