@@ -10,32 +10,47 @@ st.title("🍎 班級經營系統")
 
 save_clicked = st.button("💾 儲存今日紀錄", type="primary")
 
-# 優化手機版 CSS (縮短按鈕間距、等寬平分、優化字體大小)
+# 強力優化手機版 CSS (強制三等分，阻斷 Streamlit 預設容器撐開導致的橫向滾動)
 st.markdown("""
     <style>
     @media screen and (max-width: 768px) {
+        /* 強制排版區塊以彈性橫向排列，並不允許折行與超出螢幕 */
         [data-testid="stHorizontalBlock"] {
+            display: flex !important;
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             align-items: center !important;
-            gap: 6px !important; /* 縮短按鈕之間的左右距離 */
+            gap: 4px !important; /* 極致縮減按鈕左右間隙 */
+            width: 100% !important;
         }
-        [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            width: auto !important;
-            flex: 1 1 0px !important; /* 強制所有欄位等寬均分，完整塞入一行 */
+        /* 強制 stHorizontalBlock 下方的所有直屬子容器（即欄位）等寬均分，最大不可超過 33% */
+        [data-testid="stHorizontalBlock"] > div {
+            flex: 1 1 30% !important; 
             min-width: 0 !important;
-            padding: 0 2px !important; /* 減少左右內縮留白，增加按鈕可用寬度 */
+            max-width: 33% !important;
+            padding: 0 !important;
+            margin: 0 !important;
         }
+        /* 縮減 Streamlit 內部按鈕包裝層的垂直間距 */
+        [data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlock"] {
+            width: 100% !important;
+            gap: 0px !important;
+        }
+        div.stButton {
+            width: 100% !important;
+        }
+        /* 精細調整按鈕樣式，確保 11px 字體在 32% 寬度下完整呈現「座號-姓名」 */
         div.stButton > button {
-            padding: 2px 2px !important;
-            font-size: 12px !important; /* 稍微縮小字體，確保座號與姓名不重疊 */
-            height: 38px !important;
-            min-height: 38px !important;
+            padding: 4px 2px !important;
+            font-size: 11px !important; 
+            height: 36px !important;
+            min-height: 36px !important;
             width: 100% !important;
             margin: 0 !important;
-            white-space: nowrap !important; /* 防止文字換行 */
+            white-space: nowrap !important; /* 絕對不允許換行 */
             overflow: hidden !important;
-            text-overflow: ellipsis !important; /* 名字過長時自動顯示省略號 */
+            text-overflow: ellipsis !important; /* 超出長度時尾部顯示 ... */
+            border-radius: 4px !important;
         }
         div.stMarkdown p {
             line-height: 32px !important;
@@ -171,7 +186,7 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 一行 3 個按鈕，完美適應手機版網格
+        # 一行 3 個按鈕，配合 CSS 將完美、精準等寬呈現在手機畫面上
         chunk_size = 3
         for i in range(0, len(present_students), chunk_size):
             cols = st.columns(chunk_size)
