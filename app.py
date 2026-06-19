@@ -10,7 +10,7 @@ st.title("🍎 班級經營系統")
 
 save_clicked = st.button("💾 儲存今日紀錄", type="primary")
 
-# 優化手機版 CSS
+# 優化手機版 CSS (縮短按鈕間距、等寬平分、優化字體大小)
 st.markdown("""
     <style>
     @media screen and (max-width: 768px) {
@@ -18,25 +18,29 @@ st.markdown("""
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             align-items: center !important;
+            gap: 6px !important; /* 縮短按鈕之間的左右距離 */
         }
         [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             width: auto !important;
-            flex: 1 1 auto !important;
+            flex: 1 1 0px !important; /* 強制所有欄位等寬均分，完整塞入一行 */
             min-width: 0 !important;
-            padding: 0 4px !important;
+            padding: 0 2px !important; /* 減少左右內縮留白，增加按鈕可用寬度 */
         }
         div.stButton > button {
-            padding: 2px 4px !important;
-            font-size: 14px !important;
-            height: 40px !important;
-            min-height: 40px !important;
+            padding: 2px 2px !important;
+            font-size: 12px !important; /* 稍微縮小字體，確保座號與姓名不重疊 */
+            height: 38px !important;
+            min-height: 38px !important;
             width: 100% !important;
             margin: 0 !important;
+            white-space: nowrap !important; /* 防止文字換行 */
+            overflow: hidden !important;
+            text-overflow: ellipsis !important; /* 名字過長時自動顯示省略號 */
         }
         div.stMarkdown p {
             line-height: 32px !important;
             margin: 0 !important;
-            font-size: 14px !important;
+            font-size: 13px !important;
             white-space: nowrap !important;
         }
     }
@@ -50,7 +54,7 @@ STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleM
 HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
 GROUP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=725381119&single=true&output=csv"
-HW_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=1452088972&single=true&output=csv" 
+HW_URL = "請在此填入『作業繳交』分頁發布到網路的_CSV_網址" 
 
 @st.cache_data(ttl=60)
 def load_data(url):
@@ -167,8 +171,8 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- 優化需求 1：將加分按鈕改為網格狀 (座號-姓名) ---
-        chunk_size = 3 # 為了手機版美觀，一行 3 個
+        # 一行 3 個按鈕，完美適應手機版網格
+        chunk_size = 3
         for i in range(0, len(present_students), chunk_size):
             cols = st.columns(chunk_size)
             for j, name in enumerate(present_students[i:i+chunk_size]):
@@ -181,7 +185,6 @@ else:
                         
         st.divider()
         st.markdown("#### 累積當日抽籤與加分次數")
-        # --- 優化需求 1：下方顯示字串統計 ---
         for name in present_students:
             row = df_class[df_class['姓名'] == name].iloc[0]
             seat = int(row['座號'])
@@ -240,7 +243,6 @@ else:
         cols_to_hide = ['班級', '座號', '姓名', '日期']
         display_hw_df = class_hw_df.drop(columns=[c for c in cols_to_hide if c in class_hw_df.columns])
         
-        # --- 優化需求 2：讓下拉選單包含「已繳」、「未繳」及空白 ---
         hw_col_config = {}
         for col in display_hw_df.columns:
             hw_col_config[col] = st.column_config.SelectboxColumn(col, options=["已繳", "未繳", ""])
@@ -255,7 +257,6 @@ else:
                 df_hw_all = st.session_state['hw_all_df']
                 edited_reset = edited_display_df.reset_index()
                 
-                # --- 優化需求 2：攔截修改，轉換狀態並精準上傳 ---
                 for idx, row in edited_reset.iterrows():
                     seat_val = int(str(row['座號 - 姓名']).split(" - ")[0])
                     mask = (df_hw_all['班級'] == int(selected_class)) & (df_hw_all['座號'].fillna(0).astype(int) == seat_val)
@@ -263,9 +264,7 @@ else:
 
                     for col in edited_display_df.columns:
                         new_val = row[col]
-                        # 選擇已繳 -> 自動替換為今日日期
                         if new_val == "已繳": new_val = today_str
-                        # 選擇未繳 -> 替換為空白
                         if new_val == "未繳": new_val = ""
 
                         orig_val = orig_row[col] if orig_row is not None and col in orig_row else ""
@@ -276,7 +275,6 @@ else:
                                 "hw_name": col,
                                 "value": new_val
                             })
-                            # 更新本地 session state 畫面
                             df_hw_all.loc[mask, col] = new_val
 
                 st.session_state['hw_all_df'] = df_hw_all
@@ -304,7 +302,6 @@ else:
             hw_class = ""
             missing_seats = []
             
-            # --- 優化需求 3：聰明解析器 ---
             if "作業" in hw_input or "班級" in hw_input:
                 date_match = re.search(r'日期[：:]\s*([\d/]+)', hw_input)
                 if date_match: hw_date = date_match.group(1).strip()
@@ -320,7 +317,6 @@ else:
                     parts = re.split(r'[、,，\s]+', missing_match.group(1).strip())
                     missing_seats = [int(p) for p in parts if p.isdigit()]
             else:
-                # 處理無標籤格式: 2026/12/1、烹飪反思、301、1、5
                 parts = [p.strip() for p in re.split(r'[、,，\s]+', hw_input) if p.strip()]
                 if len(parts) >= 3:
                     if re.match(r'\d{4}/\d{1,2}/\d{1,2}', parts[0]):
@@ -338,7 +334,6 @@ else:
             elif int(hw_class) != int(selected_class):
                 st.error(f"⚠️ 貼上的班級 ({hw_class}) 與目前選擇的班級 ({selected_class}) 不符！")
             else:
-                # 準備傳送給 GAS 的完整班級學生名單
                 students_list = [{"座號": int(row['座號']), "姓名": row['姓名']} for _, row in df_class.iterrows()]
                 
                 payload = {
@@ -355,7 +350,6 @@ else:
                         res = requests.post(WEB_APP_URL, json=payload, timeout=15)
                         if res.status_code == 200:
                             st.success(f"✅ {hw_name} 紀錄匯入成功！已連動『總資料庫』與『作業繳交』雙表！")
-                            # 更新本地畫面
                             df_hw_all = st.session_state['hw_all_df']
                             if hw_name not in df_hw_all.columns: df_hw_all[hw_name] = ""
                             mask_class = df_hw_all['班級'] == int(selected_class)
