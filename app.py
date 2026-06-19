@@ -186,7 +186,7 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 一行 3 個按鈕，配合 CSS 將完美、精準等寬呈現在手機畫面上
+        # 一行 3 個按鈕，配合 CSS 將完美、精準等寬呈呈現在手機畫面上
         chunk_size = 3
         for i in range(0, len(present_students), chunk_size):
             cols = st.columns(chunk_size)
@@ -222,24 +222,64 @@ else:
         
         st.divider()
         st.subheader("📅 各週次分組紀錄")
+        
+        # 初始化或讀取該班級歷史紀錄
         if not group_df.empty and '班級' in group_df.columns:
             group_class = group_df[group_df["班級"] == int(selected_class)].copy()
-            if not group_class.empty:
-                dates = sorted(group_class["日期"].dropna().unique(), reverse=True)
-                for d in dates:
-                    st.markdown(f"**{d}**")
-                    df_date = group_class[group_class["日期"] == d]
-                    groups = df_date["分組"].dropna().unique()
-                    for g in groups:
-                        df_g = df_date[df_date["分組"] == g]
-                        members = []
-                        for _, r in df_g.iterrows():
-                            seat = int(r["座號"]) if pd.notna(r["座號"]) else ""
-                            name = str(r["姓名"]) if pd.notna(r["姓名"]) else ""
-                            members.append(f"{seat}{name}")
-                        st.write(f"{g}: {''.join(members)}")
-                    st.divider()
-            else: st.write("目前無此班級的分組紀錄。")
+        else:
+            group_class = pd.DataFrame(columns=['日期', '班級', '座號', '姓名', '分組'])
+            
+        # 取得今天日期
+        today_str = datetime.date.today().strftime("%Y/%m/%d")
+        
+        # 檢查 Session 中當前是否已有分組結果
+        has_active_grouping = any(v != "無" for v in st.session_state[f'group_dict_{selected_class}'].values())
+        
+        # 解決 Google Sheet 快取延遲：如果網頁上已經有剛剛分組完的資料，直接手動合併顯示
+        if has_active_grouping:
+            today_data = []
+            for name, g_val in st.session_state[f'group_dict_{selected_class}'].items():
+                if g_val != "無":
+                    row_student = df_class[df_class['姓名'] == name].iloc[0]
+                    today_data.append({
+                        "日期": today_str,
+                        "班級": int(selected_class),
+                        "座號": int(row_student['座號']),
+                        "姓名": name,
+                        "分組": g_val
+                    })
+            if today_data:
+                df_today = pd.DataFrame(today_data)
+                # 如果讀回來的 CSV 還沒有包含今天日期，手動把今日暫存插入最頂端
+                if group_class.empty or today_str not in group_class["日期"].values:
+                    group_class = pd.concat([df_today, group_class], ignore_index=True)
+
+        if not group_class.empty:
+            dates = sorted(group_class["日期"].dropna().unique(), reverse=True)
+            for d in dates:
+                st.markdown(f"**{d}**")
+                df_date = group_class[group_class["日期"] == d]
+                groups = df_date["分組"].dropna().unique()
+                
+                # 組別名稱排序
+                try:
+                    groups = sorted(groups, key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else x)
+                except:
+                    groups = sorted(groups)
+                    
+                for g in groups:
+                    df_g = df_date[df_date["分組"] == g]
+                    # 成員依座號排序，畫面更美觀
+                    df_g = df_g.sort_values(by="座號")
+                    members = []
+                    for _, r in df_g.iterrows():
+                        seat = int(r["座號"]) if pd.notna(r["座號"]) else ""
+                        name = str(r["姓名"]) if pd.notna(r["姓名"]) else ""
+                        members.append(f"{seat}{name}")
+                    st.write(f"{g}: {''.join(members)}")
+                st.divider()
+        else:
+            st.write("目前無此班級的分組紀錄。")
 
     with tab4:
         st.subheader("繳費管理")
