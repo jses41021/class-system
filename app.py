@@ -65,7 +65,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 設定網址 (請務必確認 HW_URL 有填入真實網址) ---
+# --- 設定網址 ---
 STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
 HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
@@ -81,7 +81,7 @@ def load_data(url):
         return pd.read_csv(fetch_url)
     except: return pd.DataFrame()
 
-# 統一清理資料格式，支援「機縫實作」文字與去除小數點 (如 301.0 -> 301)
+# 統一清理資料格式
 def to_clean_str(x):
     if pd.isna(x): return ""
     x_str = str(x).strip()
@@ -92,7 +92,7 @@ all_df = load_data(STUDENT_URL)
 history_df = load_data(HISTORY_URL)
 group_df = load_data(GROUP_URL)
 
-# 資料前處理 (確保班級、座號全為文字型態)
+# 資料前處理
 if not all_df.empty:
     for col in ['班級', '座號', '姓名']:
         if col in all_df.columns: all_df[col] = all_df[col].apply(to_clean_str)
@@ -104,7 +104,9 @@ if not history_df.empty:
 if not group_df.empty:
     for col in ['班級', '座號', '姓名']:
         if col in group_df.columns: group_df[col] = group_df[col].apply(to_clean_str)
-    cols_to_ffill = ['日期', '班級', '分組']
+    
+    # 修正重點 1: 移除 '班級' 的向下填充(ffill)，避免 301 班的資料錯誤覆蓋到 201 班的空白儲存格
+    cols_to_ffill = ['日期', '分組'] 
     for col in cols_to_ffill:
         if col in group_df.columns:
             group_df[col] = group_df[col].replace("", pd.NA).ffill().fillna("")
@@ -161,7 +163,15 @@ else:
             try:
                 payload = {"action": "append_daily", "data": all_data}
                 response = requests.post(WEB_APP_URL, json=payload, timeout=15)
-                if response.status_code == 200: st.success("✅ 今日全部資料已同步完成！")
+                if response.status_code == 200: 
+                    st.success("✅ 今日全部資料已同步完成！")
+                    
+                    # 修正重點 2: 儲存成功後立刻清除快取並重新整理畫面，讓剛存入的紀錄(含統計、分組)馬上顯示
+                    st.cache_data.clear()
+                    if 'hw_all_df' in st.session_state:
+                        del st.session_state['hw_all_df']
+                    st.rerun()
+                    
                 else: st.error(f"同步發生錯誤，狀態碼: {response.status_code}")
             except Exception as e: st.error(f"同步請求失敗: {e}")
 
@@ -230,7 +240,6 @@ else:
             draws = st.session_state[f'draws_{selected_class}'][name]
             scores = st.session_state[f'scores_{selected_class}'][name]
             st.markdown(f"{seat}-{name} - 中籤次數： **{draws}** 次、發言次數： **{scores}** 次")
-
 
     with tab3:
         st.subheader("隨機分組")
@@ -307,6 +316,18 @@ else:
         st.subheader("📝 作業繳交管理")
         df_hw_all = st.session_state['hw_all_df']
         class_hw_df = df_hw_all[df_hw_all['班級'] == selected_class].copy()
+        
+        # 修正重點 3：過濾非該班級的作業 (隱藏整欄都是空白的作業欄位)
+        standard_cols = ['班級', '座號', '姓名']
+        valid_cols = standard_cols.copy()
+        for col in class_hw_df.columns:
+            if col not in standard_cols:
+                # 檢查該班級的所有學生在這個作業中是否全部為空值
+                if not class_hw_df[col].astype(str).replace("nan", "").str.strip().eq("").all():
+                    valid_cols.append(col)
+        
+        # 只保留該班級有紀錄的作業欄位
+        class_hw_df = class_hw_df[valid_cols]
         
         class_hw_df['座號 - 姓名'] = class_hw_df['座號'].astype(str) + " - " + class_hw_df['姓名'].astype(str)
         class_hw_df.set_index('座號 - 姓名', inplace=True)
@@ -426,7 +447,8 @@ else:
                             mask_class = df_hw_all['班級'] == selected_class
                             for idx, row in df_hw_all[mask_class].iterrows():
                                 seat = str(row['座號'])
-                                df_hw_all.at[idx, hw_name] = "" if seat in missing_seats else hw_date
+                                # 修正重點 3 (下半段): 將匯入時的空值改成 "未繳"，與 GAS 邏輯完全對齊，確保過濾能正常判斷
+                                df_hw_all.at[idx, hw_name] = "未繳" if seat in missing_seats else hw_date
                             st.session_state['hw_all_df'] = df_hw_all
                             st.rerun()
                         else: st.error("⚠️ 同步失敗。")
