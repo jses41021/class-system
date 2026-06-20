@@ -408,44 +408,57 @@ else:
 
         st.divider()
         st.markdown("#### 📥 批次匯入缺交名單")
-        hw_input = st.text_area("貼上缺交名單", height=150, placeholder="可帶標籤：日期:2026/12/1、作業名稱:烹飪反思、班級:機縫實作、缺交同學座號:1、5\n或直接輸入：2026/12/1、烹飪反思、機縫實作、1、5")
+        hw_input = st.text_area("貼上缺交名單", height=150, placeholder="可帶標籤：日期:2026/12/1、作業名稱:烹飪反思、缺交名單:1、5\n或直接輸入：2026/12/1、烹飪反思、1、5")
         
         if st.button("一鍵匯入名單並同步至 Sheet", type="primary"):
             hw_input = hw_input.strip()
             hw_date = datetime.date.today().strftime("%Y/%m/%d")
             hw_name = ""
-            hw_class = ""
+            hw_class = selected_class  # 自動預設為左側目前選擇的班級，不用特別打
             missing_seats = []
             
-            if "作業" in hw_input or "班級" in hw_input:
+            # 全新升級：強效智慧型標籤解析，容許「缺交名單」、「缺交座號」等寫法
+            if any(k in hw_input for k in ["作業", "班級", "缺交", "日期", "：", ":"]):
                 date_match = re.search(r'日期[：:]\s*([\d/]+)', hw_input)
                 if date_match: hw_date = date_match.group(1).strip()
 
-                name_match = re.search(r'作業名稱[：:]\s*(.*?)(?=(?:日期|班級|缺交同學座號)[：:]|$)', hw_input, re.DOTALL)
+                # 精準切斷作業名稱，直到遇到下一個屬性(日期/班級/缺交)
+                name_match = re.search(r'作業(?:名稱)?[：:]\s*(.*?)(?=(?:日期|班級|缺交.*)[：:]|$)', hw_input, re.DOTALL)
                 if name_match: hw_name = name_match.group(1).strip().strip('、').strip(',')
 
-                class_match = re.search(r'班級[：:]\s*(.*?)(?=(?:日期|作業名稱|缺交同學座號)[：:]|$)', hw_input, re.DOTALL)
-                if class_match: hw_class = class_match.group(1).strip().strip('、').strip(',')
+                class_match = re.search(r'班級[：:]\s*(.*?)(?=(?:日期|作業.*|缺交.*)[：:]|$)', hw_input, re.DOTALL)
+                if class_match: 
+                    parsed_class = class_match.group(1).strip().strip('、').strip(',')
+                    if parsed_class: hw_class = parsed_class
 
-                missing_match = re.search(r'缺交同學座號[：:]\s*(.*)', hw_input, re.DOTALL)
+                # 完美相容「缺交同學座號:」、「缺交名單:」或單純「缺交:」
+                missing_match = re.search(r'缺交.*?[：:]\s*(.*?)(?=(?:日期|班級|作業.*)[：:]|$)', hw_input, re.DOTALL)
                 if missing_match:
-                    parts = re.split(r'[、,，\s]+', missing_match.group(1).strip())
+                    # 使用非數字切割，完美相容所有逗號、頓號、空白
+                    parts = re.split(r'[^\d]+', missing_match.group(1).strip())
                     missing_seats = [str(int(p)) for p in parts if p.isdigit()]
             else:
+                # 無標籤的備用解析
                 parts = [p.strip() for p in re.split(r'[、,，\s]+', hw_input) if p.strip()]
-                if len(parts) >= 3:
+                if len(parts) >= 2:
+                    start_idx = 0
                     if re.match(r'\d{4}/\d{1,2}/\d{1,2}', parts[0]):
                         hw_date = parts[0]
-                        hw_name = parts[1]
-                        hw_class = parts[2]
-                        missing_seats = [str(int(p)) for p in parts[3:] if p.isdigit()]
-                    else:
-                        hw_name = parts[0]
-                        hw_class = parts[1]
-                        missing_seats = [str(int(p)) for p in parts[2:] if p.isdigit()]
+                        start_idx = 1
+                    
+                    if start_idx < len(parts):
+                        hw_name = parts[start_idx]
+                        start_idx += 1
+                        
+                    # 如果有手動帶班級，就覆蓋掉預設班級
+                    if start_idx < len(parts) and (parts[start_idx] == selected_class or re.match(r'^\d{3}$', parts[start_idx])):
+                        hw_class = parts[start_idx]
+                        start_idx += 1
+                        
+                    missing_seats = [str(int(p)) for p in parts[start_idx:] if p.isdigit()]
 
-            if not hw_name or not hw_class:
-                st.error("❌ 格式解析錯誤。請確認格式包含作業名稱與班級")
+            if not hw_name:
+                st.error("❌ 格式解析錯誤。請確認有包含作業名稱。")
             elif str(hw_class) != str(selected_class):
                 st.error(f"⚠️ 貼上的班級 ({hw_class}) 與目前選擇的班級 ({selected_class}) 不符！")
             else:
