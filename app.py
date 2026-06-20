@@ -8,15 +8,8 @@ import re
 st.set_page_config(layout="wide")
 st.title("🍎 班級經營系統")
 
-col1, col2 = st.columns([1, 1])
-with col1:
-    save_clicked = st.button("💾 儲存今日紀錄", type="primary", use_container_width=True)
-with col2:
-    if st.button("🔄 重新讀取雲端資料 (跨裝置同步)", use_container_width=True):
-        st.cache_data.clear()
-        if 'hw_all_df' in st.session_state:
-            del st.session_state['hw_all_df']
-        st.rerun()
+# 移除雙按鈕設計，僅保留儲存按鈕
+save_clicked = st.button("💾 儲存今日紀錄", type="primary", use_container_width=True)
 
 # 強力優化手機版 CSS
 st.markdown("""
@@ -69,7 +62,7 @@ st.markdown("""
 STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
 HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
-GROUP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=725381119&single=true&output=csv"
+# 移除 GROUP_URL 依賴，後續直接利用 HISTORY_URL 計算分組歷史，避免錯誤
 HW_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=1452088972&single=true&output=csv" 
 
 @st.cache_data(ttl=60)
@@ -89,8 +82,13 @@ def to_clean_str(x):
     return x_str
 
 all_df = load_data(STUDENT_URL)
-history_df = load_data(HISTORY_URL)
-group_df = load_data(GROUP_URL)
+base_history_df = load_data(HISTORY_URL)
+
+# 導入樂觀更新機制(Optimistic UI)：暫存當前網頁送出的紀錄，實現秒更新
+if 'optimistic_history' not in st.session_state:
+    st.session_state['optimistic_history'] = pd.DataFrame()
+
+history_df = pd.concat([base_history_df, st.session_state['optimistic_history']], ignore_index=True)
 
 # 資料前處理
 if not all_df.empty:
@@ -100,16 +98,9 @@ if not all_df.empty:
 if not history_df.empty:
     for col in ['班級', '座號', '姓名']:
         if col in history_df.columns: history_df[col] = history_df[col].apply(to_clean_str)
-
-if not group_df.empty:
-    for col in ['班級', '座號', '姓名']:
-        if col in group_df.columns: group_df[col] = group_df[col].apply(to_clean_str)
-    
-    # 修正重點 1: 移除 '班級' 的向下填充(ffill)，避免 301 班的資料錯誤覆蓋到 201 班的空白儲存格
-    cols_to_ffill = ['日期', '分組'] 
-    for col in cols_to_ffill:
-        if col in group_df.columns:
-            group_df[col] = group_df[col].replace("", pd.NA).ffill().fillna("")
+    # 過濾同一天、同座號的重複送出紀錄，以確保統計精準
+    if '日期' in history_df.columns:
+        history_df = history_df.drop_duplicates(subset=['日期', '班級', '座號', '姓名'], keep='last')
 
 if all_df.empty:
     st.warning("⚠️ 學生名單讀取失敗！")
@@ -166,10 +157,11 @@ else:
                 if response.status_code == 200: 
                     st.success("✅ 今日全部資料已同步完成！")
                     
-                    # 修正重點 2: 儲存成功後立刻清除快取並重新整理畫面，讓剛存入的紀錄(含統計、分組)馬上顯示
+                    # 將儲存的資料注入暫存區，實現無延遲的資料刷新
+                    new_records = pd.DataFrame(all_data)
+                    st.session_state['optimistic_history'] = pd.concat([st.session_state['optimistic_history'], new_records], ignore_index=True)
+                    
                     st.cache_data.clear()
-                    if 'hw_all_df' in st.session_state:
-                        del st.session_state['hw_all_df']
                     st.rerun()
                     
                 else: st.error(f"同步發生錯誤，狀態碼: {response.status_code}")
@@ -195,6 +187,10 @@ else:
                     '發言次數': 'sum', 
                     '中籤次數': 'sum'
                 }).reset_index()
+                
+                # 強制轉換為數值進行排序，解決字串排序 10 比 2 前面的問題
+                stats['numeric_seat'] = pd.to_numeric(stats['座號'], errors='coerce').fillna(999)
+                stats = stats.sort_values(by='numeric_seat').drop(columns=['numeric_seat'])
                 
                 stats['座號 - 姓名'] = stats['座號'].astype(str) + " - " + stats['姓名'].astype(str)
                 stats.set_index('座號 - 姓名', inplace=True)
@@ -256,8 +252,12 @@ else:
         st.divider()
         st.subheader("📅 各週次分組紀錄")
         
-        if not group_df.empty and '班級' in group_df.columns:
-            group_class = group_df[group_df["班級"] == selected_class].copy()
+        # 直接由總資料庫 history_df 中過濾出該班級真實的分組紀錄，徹底解決資料錯亂問題
+        if not history_df.empty and '班級' in history_df.columns and '分組' in history_df.columns:
+            group_class = history_df[(history_df["班級"] == selected_class) & 
+                                     (history_df["分組"].notna()) & 
+                                     (history_df["分組"] != "無") & 
+                                     (history_df["分組"] != "")].copy()
         else:
             group_class = pd.DataFrame(columns=['日期', '班級', '座號', '姓名', '分組'])
             
@@ -278,7 +278,11 @@ else:
                     })
             if today_data:
                 df_today = pd.DataFrame(today_data)
+                # 即時顯示今日尚未存檔的分組或覆蓋同日的歷史紀錄
                 if group_class.empty or today_str not in group_class["日期"].values:
+                    group_class = pd.concat([df_today, group_class], ignore_index=True)
+                else:
+                    group_class = group_class[group_class["日期"] != today_str]
                     group_class = pd.concat([df_today, group_class], ignore_index=True)
 
         if not group_class.empty:
@@ -294,14 +298,18 @@ else:
                     groups = sorted(groups)
                     
                 for g in groups:
-                    df_g = df_date[df_date["分組"] == g]
-                    df_g = df_g.sort_values(by="座號")
+                    df_g = df_date[df_date["分組"] == g].copy()
+                    
+                    # 確保同組內人員照座號排好
+                    df_g['numeric_seat'] = pd.to_numeric(df_g['座號'], errors='coerce').fillna(999)
+                    df_g = df_g.sort_values(by="numeric_seat")
+                    
                     members = []
                     for _, r in df_g.iterrows():
                         seat = str(r["座號"]) if pd.notna(r["座號"]) else ""
                         name = str(r["姓名"]) if pd.notna(r["姓名"]) else ""
                         members.append(f"{seat}{name}")
-                    st.write(f"{g}: {''.join(members)}")
+                    st.write(f"{g}: {' '.join(members)}")
                 st.divider()
         else:
             st.write("目前無此班級的分組紀錄。")
@@ -317,17 +325,18 @@ else:
         df_hw_all = st.session_state['hw_all_df']
         class_hw_df = df_hw_all[df_hw_all['班級'] == selected_class].copy()
         
-        # 修正重點 3：過濾非該班級的作業 (隱藏整欄都是空白的作業欄位)
         standard_cols = ['班級', '座號', '姓名']
         valid_cols = standard_cols.copy()
         for col in class_hw_df.columns:
             if col not in standard_cols:
-                # 檢查該班級的所有學生在這個作業中是否全部為空值
                 if not class_hw_df[col].astype(str).replace("nan", "").str.strip().eq("").all():
                     valid_cols.append(col)
         
-        # 只保留該班級有紀錄的作業欄位
         class_hw_df = class_hw_df[valid_cols]
+        
+        # 加入數值排序邏輯確保作業清單的座號順序正常
+        class_hw_df['numeric_seat'] = pd.to_numeric(class_hw_df['座號'], errors='coerce').fillna(999)
+        class_hw_df = class_hw_df.sort_values(by='numeric_seat').drop(columns=['numeric_seat'])
         
         class_hw_df['座號 - 姓名'] = class_hw_df['座號'].astype(str) + " - " + class_hw_df['姓名'].astype(str)
         class_hw_df.set_index('座號 - 姓名', inplace=True)
@@ -447,7 +456,6 @@ else:
                             mask_class = df_hw_all['班級'] == selected_class
                             for idx, row in df_hw_all[mask_class].iterrows():
                                 seat = str(row['座號'])
-                                # 修正重點 3 (下半段): 將匯入時的空值改成 "未繳"，與 GAS 邏輯完全對齊，確保過濾能正常判斷
                                 df_hw_all.at[idx, hw_name] = "未繳" if seat in missing_seats else hw_date
                             st.session_state['hw_all_df'] = df_hw_all
                             st.rerun()
