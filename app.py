@@ -8,22 +8,28 @@ import re
 st.set_page_config(layout="wide")
 st.title("🍎 班級經營系統")
 
-save_clicked = st.button("💾 儲存今日紀錄", type="primary")
+col1, col2 = st.columns([1, 1])
+with col1:
+    save_clicked = st.button("💾 儲存今日紀錄", type="primary", use_container_width=True)
+with col2:
+    if st.button("🔄 重新讀取雲端資料 (跨裝置同步)", use_container_width=True):
+        st.cache_data.clear()
+        if 'hw_all_df' in st.session_state:
+            del st.session_state['hw_all_df']
+        st.rerun()
 
-# 強力優化手機版 CSS (強制三等分，阻斷 Streamlit 預設容器撐開導致的橫向滾動)
+# 強力優化手機版 CSS
 st.markdown("""
     <style>
     @media screen and (max-width: 768px) {
-        /* 強制排版區塊以彈性橫向排列，並不允許折行與超出螢幕 */
         [data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
             flex-wrap: nowrap !important;
             align-items: center !important;
-            gap: 4px !important; /* 極致縮減按鈕左右間隙 */
+            gap: 4px !important; 
             width: 100% !important;
         }
-        /* 強制 stHorizontalBlock 下方的所有直屬子容器（即欄位）等寬均分，最大不可超過 33% */
         [data-testid="stHorizontalBlock"] > div {
             flex: 1 1 30% !important; 
             min-width: 0 !important;
@@ -31,15 +37,11 @@ st.markdown("""
             padding: 0 !important;
             margin: 0 !important;
         }
-        /* 縮減 Streamlit 內部按鈕包裝層的垂直間距 */
         [data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlock"] {
             width: 100% !important;
             gap: 0px !important;
         }
-        div.stButton {
-            width: 100% !important;
-        }
-        /* 精細調整按鈕樣式，確保 11px 字體在 32% 寬度下完整呈現「座號-姓名」 */
+        div.stButton { width: 100% !important; }
         div.stButton > button {
             padding: 4px 2px !important;
             font-size: 11px !important; 
@@ -47,9 +49,9 @@ st.markdown("""
             min-height: 36px !important;
             width: 100% !important;
             margin: 0 !important;
-            white-space: nowrap !important; /* 絕對不允許換行 */
+            white-space: nowrap !important; 
             overflow: hidden !important;
-            text-overflow: ellipsis !important; /* 超出長度時尾部顯示 ... */
+            text-overflow: ellipsis !important; 
             border-radius: 4px !important;
         }
         div.stMarkdown p {
@@ -59,46 +61,69 @@ st.markdown("""
             white-space: nowrap !important;
         }
     }
-    /* 讓作業表格的輸入框寬一點 */
     [data-testid="stDataFrame"] { width: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 設定網址 ---
+# --- 設定網址 (請務必確認 HW_URL 有填入真實網址) ---
 STUDENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=0&single=true&output=csv"
 HISTORY_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=2042566365&single=true&output=csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz6v1LiJXiMQobPT-knkNUBSZ4ut4OwUbcKpzoFiSWKMaj2s8dqsKcmYeuJP8_bVY8UYw/exec"
 GROUP_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=725381119&single=true&output=csv"
-HW_URL = "請在此填入『作業繳交』分頁發布到網路的_CSV_網址" 
+HW_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8_2gDvKiTieAleMNeHdN1owBrEtkhhWBrg3Bpl3b8CzURHgOBouqPJ-_-LTbP8ZXJyPywXlnTKkKj/pub?gid=1452088972&single=true&output=csv" 
 
 @st.cache_data(ttl=60)
 def load_data(url):
     if not url or url.startswith("請在此"): return pd.DataFrame()
-    try: return pd.read_csv(url)
+    try: 
+        # 加入時間戳記繞過 Google CDN 延遲
+        fetch_url = f"{url}&_t={int(datetime.datetime.now().timestamp())}" if "?" in url else f"{url}?_t={int(datetime.datetime.now().timestamp())}"
+        return pd.read_csv(fetch_url)
     except: return pd.DataFrame()
+
+# 統一清理資料格式，支援「機縫實作」文字與去除小數點 (如 301.0 -> 301)
+def to_clean_str(x):
+    if pd.isna(x): return ""
+    x_str = str(x).strip()
+    if x_str.endswith(".0"): return x_str[:-2]
+    return x_str
 
 all_df = load_data(STUDENT_URL)
 history_df = load_data(HISTORY_URL)
 group_df = load_data(GROUP_URL)
 
-if not history_df.empty and '班級' in history_df.columns:
-    history_df['班級'] = pd.to_numeric(history_df['班級'], errors='coerce')
-if not group_df.empty and '班級' in group_df.columns:
-    group_df['班級'] = pd.to_numeric(group_df['班級'], errors='coerce')
+# 資料前處理 (確保班級、座號全為文字型態)
+if not all_df.empty:
+    for col in ['班級', '座號', '姓名']:
+        if col in all_df.columns: all_df[col] = all_df[col].apply(to_clean_str)
+
+if not history_df.empty:
+    for col in ['班級', '座號', '姓名']:
+        if col in history_df.columns: history_df[col] = history_df[col].apply(to_clean_str)
+
+if not group_df.empty:
+    for col in ['班級', '座號', '姓名']:
+        if col in group_df.columns: group_df[col] = group_df[col].apply(to_clean_str)
     cols_to_ffill = ['日期', '班級', '分組']
     for col in cols_to_ffill:
         if col in group_df.columns:
-            group_df[col] = group_df[col].ffill()
+            group_df[col] = group_df[col].replace("", pd.NA).ffill().fillna("")
 
 if all_df.empty:
     st.warning("⚠️ 學生名單讀取失敗！")
 else:
-    selected_class = st.sidebar.selectbox("請選擇班級", all_df["班級"].unique())
+    selected_class = str(st.sidebar.selectbox("請選擇班級", all_df["班級"].unique()))
     df_class = all_df[all_df["班級"] == selected_class].copy()
     
     if 'hw_all_df' not in st.session_state:
         hw_loaded = load_data(HW_URL)
-        if hw_loaded.empty or '班級' not in hw_loaded.columns:
+        if not hw_loaded.empty and '班級' in hw_loaded.columns:
+            for col in ['班級', '座號', '姓名']:
+                if col in hw_loaded.columns: hw_loaded[col] = hw_loaded[col].apply(to_clean_str)
+            # 使用 left merge 保留原本的作業紀錄，並補上剛剛新增的學生
+            hw_loaded = pd.merge(all_df[['班級', '座號', '姓名']], hw_loaded, on=['班級', '座號', '姓名'], how='left')
+            hw_loaded = hw_loaded.fillna("")
+        else:
             hw_loaded = all_df[['班級', '座號', '姓名']].copy()
         st.session_state['hw_all_df'] = hw_loaded
 
@@ -110,7 +135,7 @@ else:
         for name in df_class["姓名"]:
             has_paid = False
             if not history_df.empty and '繳費狀態' in history_df.columns:
-                student_hist = history_df[(history_df["姓名"] == name) & (history_df["班級"] == int(selected_class))]
+                student_hist = history_df[(history_df["姓名"] == name) & (history_df["班級"] == selected_class)]
                 if (student_hist["繳費狀態"] == "已繳").any():
                     has_paid = True
             st.session_state[f'payment_{selected_class}'][name] = has_paid
@@ -124,8 +149,8 @@ else:
                 row = df_class[df_class['姓名'] == name].iloc[0]
                 all_data.append({
                     "日期": datetime.date.today().strftime("%Y/%m/%d"),
-                    "班級": int(row['班級']),
-                    "座號": int(row['座號']),
+                    "班級": str(row['班級']),
+                    "座號": str(row['座號']),
                     "姓名": name,
                     "出席狀態": "出席" if st.session_state[f'attendance_{selected_class}'][name] else "缺席",
                     "繳費狀態": "已繳" if st.session_state[f'payment_{selected_class}'][name] else "未繳",
@@ -146,13 +171,13 @@ else:
         st.subheader("點名")
         for _, row in df_class.iterrows():
             name = row['姓名']
-            disp = f"{int(row['班級'])}-{int(row['座號'])}-{name}"
+            disp = f"{row['班級']}-{row['座號']}-{name}"
             st.session_state[f'attendance_{selected_class}'][name] = st.checkbox(disp, value=st.session_state[f'attendance_{selected_class}'][name])
 
         st.divider()
         st.subheader("📊 個人累積統計表")
         if not history_df.empty:
-            class_hist = history_df[history_df["班級"] == int(selected_class)].copy()
+            class_hist = history_df[history_df["班級"] == selected_class].copy()
             if not class_hist.empty:
                 stats = class_hist.groupby(['班級', '座號', '姓名']).agg({
                     '出席狀態': lambda x: (x == '出席').sum(),
@@ -161,7 +186,7 @@ else:
                     '中籤次數': 'sum'
                 }).reset_index()
                 
-                stats['座號 - 姓名'] = stats['座號'].fillna(0).astype(int).astype(str) + " - " + stats['姓名']
+                stats['座號 - 姓名'] = stats['座號'].astype(str) + " - " + stats['姓名'].astype(str)
                 stats.set_index('座號 - 姓名', inplace=True)
                 display_stats = stats.drop(columns=['班級', '座號', '姓名'])
                 st.dataframe(display_stats, use_container_width=True)
@@ -182,17 +207,16 @@ else:
         if st.session_state[f'last_winner_{selected_class}']:
             winner = st.session_state[f'last_winner_{selected_class}']
             w_row = df_class[df_class['姓名'] == winner].iloc[0]
-            st.success(f"🎉 抽中：{int(w_row['座號'])}-{winner}")
+            st.success(f"🎉 抽中：{w_row['座號']}-{winner}")
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 一行 3 個按鈕，配合 CSS 將完美、精準等寬呈呈現在手機畫面上
         chunk_size = 3
         for i in range(0, len(present_students), chunk_size):
             cols = st.columns(chunk_size)
             for j, name in enumerate(present_students[i:i+chunk_size]):
                 row = df_class[df_class['姓名'] == name].iloc[0]
-                seat = int(row['座號'])
+                seat = row['座號']
                 with cols[j]:
                     if st.button(f"{seat}-{name}", key=f"score_{name}"):
                         st.session_state[f'scores_{selected_class}'][name] += 1
@@ -202,7 +226,7 @@ else:
         st.markdown("#### 累積當日抽籤與加分次數")
         for name in present_students:
             row = df_class[df_class['姓名'] == name].iloc[0]
-            seat = int(row['座號'])
+            seat = row['座號']
             draws = st.session_state[f'draws_{selected_class}'][name]
             scores = st.session_state[f'scores_{selected_class}'][name]
             st.markdown(f"{seat}-{name} - 中籤次數： **{draws}** 次、發言次數： **{scores}** 次")
@@ -217,25 +241,20 @@ else:
             for name in df_class["姓名"]: st.session_state[f'group_dict_{selected_class}'][name] = "無"
             for i, g in enumerate(groups):
                 group_name = f"第 {i+1} 組"
-                st.write(f"{group_name}: {', '.join([f'{int(df_class.loc[df_class['姓名']==name, '座號'].values[0])} {name}' for name in g])}")
+                st.write(f"{group_name}: {', '.join([f'{str(df_class.loc[df_class['姓名']==name, '座號'].values[0])} {name}' for name in g])}")
                 for name in g: st.session_state[f'group_dict_{selected_class}'][name] = group_name
         
         st.divider()
         st.subheader("📅 各週次分組紀錄")
         
-        # 初始化或讀取該班級歷史紀錄
         if not group_df.empty and '班級' in group_df.columns:
-            group_class = group_df[group_df["班級"] == int(selected_class)].copy()
+            group_class = group_df[group_df["班級"] == selected_class].copy()
         else:
             group_class = pd.DataFrame(columns=['日期', '班級', '座號', '姓名', '分組'])
             
-        # 取得今天日期
         today_str = datetime.date.today().strftime("%Y/%m/%d")
-        
-        # 檢查 Session 中當前是否已有分組結果
         has_active_grouping = any(v != "無" for v in st.session_state[f'group_dict_{selected_class}'].values())
         
-        # 解決 Google Sheet 快取延遲：如果網頁上已經有剛剛分組完的資料，直接手動合併顯示
         if has_active_grouping:
             today_data = []
             for name, g_val in st.session_state[f'group_dict_{selected_class}'].items():
@@ -243,14 +262,13 @@ else:
                     row_student = df_class[df_class['姓名'] == name].iloc[0]
                     today_data.append({
                         "日期": today_str,
-                        "班級": int(selected_class),
-                        "座號": int(row_student['座號']),
+                        "班級": selected_class,
+                        "座號": str(row_student['座號']),
                         "姓名": name,
                         "分組": g_val
                     })
             if today_data:
                 df_today = pd.DataFrame(today_data)
-                # 如果讀回來的 CSV 還沒有包含今天日期，手動把今日暫存插入最頂端
                 if group_class.empty or today_str not in group_class["日期"].values:
                     group_class = pd.concat([df_today, group_class], ignore_index=True)
 
@@ -261,7 +279,6 @@ else:
                 df_date = group_class[group_class["日期"] == d]
                 groups = df_date["分組"].dropna().unique()
                 
-                # 組別名稱排序
                 try:
                     groups = sorted(groups, key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else x)
                 except:
@@ -269,11 +286,10 @@ else:
                     
                 for g in groups:
                     df_g = df_date[df_date["分組"] == g]
-                    # 成員依座號排序，畫面更美觀
                     df_g = df_g.sort_values(by="座號")
                     members = []
                     for _, r in df_g.iterrows():
-                        seat = int(r["座號"]) if pd.notna(r["座號"]) else ""
+                        seat = str(r["座號"]) if pd.notna(r["座號"]) else ""
                         name = str(r["姓名"]) if pd.notna(r["姓名"]) else ""
                         members.append(f"{seat}{name}")
                     st.write(f"{g}: {''.join(members)}")
@@ -285,14 +301,14 @@ else:
         st.subheader("繳費管理")
         for _, row in df_class.iterrows():
             name = row['姓名']
-            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(f"{int(row['班級'])}-{int(row['座號'])}-{name}", value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
+            st.session_state[f'payment_{selected_class}'][name] = st.checkbox(f"{row['班級']}-{row['座號']}-{name}", value=st.session_state[f'payment_{selected_class}'][name], key=f"pay_{name}")
 
     with tab5:
         st.subheader("📝 作業繳交管理")
         df_hw_all = st.session_state['hw_all_df']
-        class_hw_df = df_hw_all[df_hw_all['班級'] == int(selected_class)].copy()
+        class_hw_df = df_hw_all[df_hw_all['班級'] == selected_class].copy()
         
-        class_hw_df['座號 - 姓名'] = class_hw_df['座號'].fillna(0).astype(int).astype(str) + " - " + class_hw_df['姓名']
+        class_hw_df['座號 - 姓名'] = class_hw_df['座號'].astype(str) + " - " + class_hw_df['姓名'].astype(str)
         class_hw_df.set_index('座號 - 姓名', inplace=True)
         
         cols_to_hide = ['班級', '座號', '姓名', '日期']
@@ -313,8 +329,8 @@ else:
                 edited_reset = edited_display_df.reset_index()
                 
                 for idx, row in edited_reset.iterrows():
-                    seat_val = int(str(row['座號 - 姓名']).split(" - ")[0])
-                    mask = (df_hw_all['班級'] == int(selected_class)) & (df_hw_all['座號'].fillna(0).astype(int) == seat_val)
+                    seat_val_str = str(row['座號 - 姓名']).split(" - ")[0]
+                    mask = (df_hw_all['班級'] == selected_class) & (df_hw_all['座號'] == seat_val_str)
                     orig_row = df_hw_all[mask].iloc[0] if not df_hw_all[mask].empty else None
 
                     for col in edited_display_df.columns:
@@ -325,8 +341,8 @@ else:
                         orig_val = orig_row[col] if orig_row is not None and col in orig_row else ""
                         if str(new_val) != str(orig_val):
                             updates.append({
-                                "class_num": int(selected_class),
-                                "seat": seat_val,
+                                "class_num": selected_class,
+                                "seat": seat_val_str,
                                 "hw_name": col,
                                 "value": new_val
                             })
@@ -348,7 +364,7 @@ else:
 
         st.divider()
         st.markdown("#### 📥 批次匯入缺交名單")
-        hw_input = st.text_area("貼上缺交名單", height=150, placeholder="可帶標籤：日期:2026/12/1、作業名稱:烹飪反思、班級:301、缺交同學座號:1、5\n或直接輸入：2026/12/1、烹飪反思、301、1、5")
+        hw_input = st.text_area("貼上缺交名單", height=150, placeholder="可帶標籤：日期:2026/12/1、作業名稱:烹飪反思、班級:機縫實作、缺交同學座號:1、5\n或直接輸入：2026/12/1、烹飪反思、機縫實作、1、5")
         
         if st.button("一鍵匯入名單並同步至 Sheet", type="primary"):
             hw_input = hw_input.strip()
@@ -364,13 +380,13 @@ else:
                 name_match = re.search(r'作業名稱[：:]\s*(.*?)(?=(?:日期|班級|缺交同學座號)[：:]|$)', hw_input, re.DOTALL)
                 if name_match: hw_name = name_match.group(1).strip().strip('、').strip(',')
 
-                class_match = re.search(r'班級[：:]\s*(\d+)', hw_input)
-                if class_match: hw_class = class_match.group(1).strip()
+                class_match = re.search(r'班級[：:]\s*(.*?)(?=(?:日期|作業名稱|缺交同學座號)[：:]|$)', hw_input, re.DOTALL)
+                if class_match: hw_class = class_match.group(1).strip().strip('、').strip(',')
 
                 missing_match = re.search(r'缺交同學座號[：:]\s*(.*)', hw_input, re.DOTALL)
                 if missing_match:
                     parts = re.split(r'[、,，\s]+', missing_match.group(1).strip())
-                    missing_seats = [int(p) for p in parts if p.isdigit()]
+                    missing_seats = [str(int(p)) for p in parts if p.isdigit()]
             else:
                 parts = [p.strip() for p in re.split(r'[、,，\s]+', hw_input) if p.strip()]
                 if len(parts) >= 3:
@@ -378,24 +394,24 @@ else:
                         hw_date = parts[0]
                         hw_name = parts[1]
                         hw_class = parts[2]
-                        missing_seats = [int(p) for p in parts[3:] if p.isdigit()]
+                        missing_seats = [str(int(p)) for p in parts[3:] if p.isdigit()]
                     else:
                         hw_name = parts[0]
                         hw_class = parts[1]
-                        missing_seats = [int(p) for p in parts[2:] if p.isdigit()]
+                        missing_seats = [str(int(p)) for p in parts[2:] if p.isdigit()]
 
             if not hw_name or not hw_class:
                 st.error("❌ 格式解析錯誤。請確認格式包含作業名稱與班級")
-            elif int(hw_class) != int(selected_class):
+            elif str(hw_class) != str(selected_class):
                 st.error(f"⚠️ 貼上的班級 ({hw_class}) 與目前選擇的班級 ({selected_class}) 不符！")
             else:
-                students_list = [{"座號": int(row['座號']), "姓名": row['姓名']} for _, row in df_class.iterrows()]
+                students_list = [{"座號": str(row['座號']), "姓名": row['姓名']} for _, row in df_class.iterrows()]
                 
                 payload = {
                     "action": "batch_import_hw",
                     "date": hw_date,
                     "hw_name": hw_name,
-                    "class_num": int(hw_class),
+                    "class_num": str(hw_class),
                     "missing_seats": missing_seats,
                     "students": students_list
                 }
@@ -407,9 +423,9 @@ else:
                             st.success(f"✅ {hw_name} 紀錄匯入成功！已連動『總資料庫』與『作業繳交』雙表！")
                             df_hw_all = st.session_state['hw_all_df']
                             if hw_name not in df_hw_all.columns: df_hw_all[hw_name] = ""
-                            mask_class = df_hw_all['班級'] == int(selected_class)
+                            mask_class = df_hw_all['班級'] == selected_class
                             for idx, row in df_hw_all[mask_class].iterrows():
-                                seat = int(row['座號'])
+                                seat = str(row['座號'])
                                 df_hw_all.at[idx, hw_name] = "" if seat in missing_seats else hw_date
                             st.session_state['hw_all_df'] = df_hw_all
                             st.rerun()
