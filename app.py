@@ -252,12 +252,10 @@ else:
         st.divider()
         st.subheader("📅 各週次分組紀錄")
         
-        # 直接由總資料庫 history_df 中過濾出該班級真實的分組紀錄，徹底解決資料錯亂問題
+        # 直接由總資料庫 history_df 中過濾出該班級真實的分組紀錄 (不再過濾掉「無」)
         if not history_df.empty and '班級' in history_df.columns and '分組' in history_df.columns:
             group_class = history_df[(history_df["班級"] == selected_class) & 
-                                     (history_df["分組"].notna()) & 
-                                     (history_df["分組"] != "無") & 
-                                     (history_df["分組"] != "")].copy()
+                                     (history_df["分組"].notna())].copy()
         else:
             group_class = pd.DataFrame(columns=['日期', '班級', '座號', '姓名', '分組'])
             
@@ -267,15 +265,14 @@ else:
         if has_active_grouping:
             today_data = []
             for name, g_val in st.session_state[f'group_dict_{selected_class}'].items():
-                if g_val != "無":
-                    row_student = df_class[df_class['姓名'] == name].iloc[0]
-                    today_data.append({
-                        "日期": today_str,
-                        "班級": selected_class,
-                        "座號": str(row_student['座號']),
-                        "姓名": name,
-                        "分組": g_val
-                    })
+                row_student = df_class[df_class['姓名'] == name].iloc[0]
+                today_data.append({
+                    "日期": today_str,
+                    "班級": selected_class,
+                    "座號": str(row_student['座號']),
+                    "姓名": name,
+                    "分組": g_val
+                })
             if today_data:
                 df_today = pd.DataFrame(today_data)
                 # 即時顯示今日尚未存檔的分組或覆蓋同日的歷史紀錄
@@ -292,12 +289,15 @@ else:
                 df_date = group_class[group_class["日期"] == d]
                 groups = df_date["分組"].dropna().unique()
                 
+                # 將「有分組」與「無分組」分開處理，先處理正常組別
+                regular_groups = [g for g in groups if str(g).strip() not in ["無", ""]]
+                
                 try:
-                    groups = sorted(groups, key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else x)
+                    regular_groups = sorted(regular_groups, key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else x)
                 except:
-                    groups = sorted(groups)
+                    regular_groups = sorted(regular_groups)
                     
-                for g in groups:
+                for g in regular_groups:
                     df_g = df_date[df_date["分組"] == g].copy()
                     
                     # 確保同組內人員照座號排好
@@ -310,6 +310,20 @@ else:
                         name = str(r["姓名"]) if pd.notna(r["姓名"]) else ""
                         members.append(f"{seat}{name}")
                     st.write(f"{g}: {' '.join(members)}")
+                    
+                # 在最後處理並顯示無分組(缺席)的同學名單
+                df_unassigned = df_date[df_date["分組"].astype(str).str.strip().isin(["無", ""])].copy()
+                if not df_unassigned.empty:
+                    df_unassigned['numeric_seat'] = pd.to_numeric(df_unassigned['座號'], errors='coerce').fillna(999)
+                    df_unassigned = df_unassigned.sort_values(by="numeric_seat")
+                    
+                    members_unassigned = []
+                    for _, r in df_unassigned.iterrows():
+                        seat = str(r["座號"]) if pd.notna(r["座號"]) else ""
+                        name = str(r["姓名"]) if pd.notna(r["姓名"]) else ""
+                        members_unassigned.append(f"{seat}{name}")
+                    st.write(f"無分組: {' '.join(members_unassigned)}")
+                    
                 st.divider()
         else:
             st.write("目前無此班級的分組紀錄。")
